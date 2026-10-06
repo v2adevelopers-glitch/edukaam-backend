@@ -1,0 +1,62 @@
+{
+  "modules": [
+    { "slug": "dashboard", "name": "Dashboard" },
+    { "slug": "provider-profile", "name": "Provider Profile" },
+    { "slug": "seeker-profile", "name": "Seeker Profile" },
+    { "slug": "jobs", "name": "Jobs" },
+    { "slug": "applications", "name": "Applications" },
+    { "slug": "openings", "name": "Openings" },
+    { "slug": "my-applications", "name": "My Applications" },
+    { "slug": "masters", "name": "Master Data" }
+  ],
+  "menus": [
+    { "slug": "dashboard", "name": "Dashboard", "icon": "dashboard", "route_to": "/", "module": "dashboard", "ranking": 1, "parent": null },
+    { "slug": "institution-profile", "name": "Institution Profile", "icon": "business", "route_to": "/profile/view", "module": "provider-profile", "ranking": 2, "parent": null },
+    { "slug": "my-profile", "name": "My Profile", "icon": "person", "route_to": "/profile/view", "module": "seeker-profile", "ranking": 2, "parent": null },
+    { "slug": "jobs", "name": "Jobs", "icon": "work", "route_to": null, "module": "jobs", "ranking": 3, "parent": null },
+    { "slug": "post-job", "name": "Post a Job", "icon": "add_circle", "route_to": "/jobs/add", "module": "jobs", "ranking": 1, "parent": "jobs" },
+    { "slug": "my-jobs", "name": "My Jobs", "icon": "list", "route_to": "/jobs/list", "module": "jobs", "ranking": 2, "parent": "jobs" },
+    { "slug": "applicants", "name": "Applicants", "icon": "people", "route_to": "/applications/list", "module": "applications", "ranking": 4, "parent": null },
+    { "slug": "find-jobs", "name": "Find Jobs", "icon": "search", "route_to": "/openings/list", "module": "openings", "ranking": 3, "parent": null },
+    { "slug": "my-applications", "name": "My Applications", "icon": "assignment", "route_to": "/my-applications/list", "module": "my-applications", "ranking": 4, "parent": null }
+  ],
+  "role_access": [
+    { "role_code": 1001, "module": "masters", "menu_access": false, "read_access": true, "write_access": true, "update_access": true, "delete_access": true, "full_access": true },
+
+    { "role_code": 1002, "module": "dashboard", "menu_access": true, "read_access": true },
+    { "role_code": 1002, "module": "provider-profile", "menu_access": true, "read_access": true, "update_access": true },
+    { "role_code": 1002, "module": "jobs", "menu_access": true, "read_access": true, "write_access": true, "update_access": true, "delete_access": true },
+    { "role_code": 1002, "module": "applications", "menu_access": true, "read_access": true, "update_access": true },
+
+    { "role_code": 1003, "module": "dashboard", "menu_access": true, "read_access": true },
+    { "role_code": 1003, "module": "seeker-profile", "menu_access": true, "read_access": true, "update_access": true },
+    { "role_code": 1003, "module": "openings", "menu_access": true, "read_access": true },
+    { "role_code": 1003, "module": "my-applications", "menu_access": true, "read_access": true, "write_access": true, "delete_access": true }
+  ],
+  "api_mappings": [
+    { "module": "masters", "api_endpoint": "/api/v1/master/job-categories", "api_method": "POST", "api_slug": "create-job-category" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/job-categories/:categorycode", "api_method": "PATCH", "api_slug": "update-job-category" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/job-categories/:categorycode", "api_method": "DELETE", "api_slug": "delete-job-category" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/institution-types", "api_method": "POST", "api_slug": "create-institution-type" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/institution-types/:typecode", "api_method": "PATCH", "api_slug": "update-institution-type" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/institution-types/:typecode", "api_method": "DELETE", "api_slug": "delete-institution-type" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/states", "api_method": "POST", "api_slug": "create-state" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/states/:statecode", "api_method": "PATCH", "api_slug": "update-state" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/states/:statecode", "api_method": "DELETE", "api_slug": "delete-state" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/cities", "api_method": "POST", "api_slug": "create-city" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/cities/:citycode", "api_method": "PATCH", "api_slug": "update-city" },
+    { "module": "masters", "api_endpoint": "/api/v1/master/cities/:citycode", "api_method": "DELETE", "api_slug": "delete-city" },
+
+    { "module": "provider-profile", "api_endpoint": "/api/v1/profile/provider/me", "api_method": "PATCH", "api_slug": "update-provider-profile" },
+    { "module": "seeker-profile", "api_endpoint": "/api/v1/profile/seeker/me", "api_method": "PATCH", "api_slug": "update-seeker-profile" },
+
+    { "module": "jobs", "api_endpoint": "/api/v1/job/jobs", "api_method": "POST", "api_slug": "create-job" },
+    { "module": "jobs", "api_endpoint": "/api/v1/job/jobs/:jobid", "api_method": "PATCH", "api_slug": "update-job" },
+    { "module": "jobs", "api_endpoint": "/api/v1/job/jobs/:jobid", "api_method": "DELETE", "api_slug": "delete-job" },
+
+    { "module": "applications", "api_endpoint": "/api/v1/application/applications/:applicationid", "api_method": "PATCH", "api_slug": "update-application-status" },
+
+    { "module": "my-applications", "api_endpoint": "/api/v1/application/my-applications", "api_method": "POST", "api_slug": "apply-to-job" },
+    { "module": "my-applications", "api_endpoint": "/api/v1/application/my-applications/:applicationid", "api_method": "DELETE", "api_slug": "withdraw-application" }
+  ]
+}

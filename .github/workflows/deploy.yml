@@ -1,0 +1,24 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+      - run: npm ci
+      - run: echo "${{ secrets.DEV_ENV }}" > .env
+      - run: npm install -g pm2
+      - name: Start or restart pm2 process
+        run: |
+          pm2 delete edujobs_api || true
+          pm2 start ./app.js --name "edujobs_api"
+          pm2 save
+      - run: pm2 list

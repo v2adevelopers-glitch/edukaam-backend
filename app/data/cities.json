@@ -1,0 +1,997 @@
+[
+  {
+    "code": "EDJCTY00001",
+    "name": "Visakhapatnam",
+    "state_code": "EDJSTA00001"
+  },
+  {
+    "code": "EDJCTY00002",
+    "name": "Vijayawada",
+    "state_code": "EDJSTA00001"
+  },
+  {
+    "code": "EDJCTY00003",
+    "name": "Guntur",
+    "state_code": "EDJSTA00001"
+  },
+  {
+    "code": "EDJCTY00004",
+    "name": "Nellore",
+    "state_code": "EDJSTA00001"
+  },
+  {
+    "code": "EDJCTY00005",
+    "name": "Tirupati",
+    "state_code": "EDJSTA00001"
+  },
+  {
+    "code": "EDJCTY00006",
+    "name": "Kurnool",
+    "state_code": "EDJSTA00001"
+  },
+  {
+    "code": "EDJCTY00007",
+    "name": "Kakinada",
+    "state_code": "EDJSTA00001"
+  },
+  {
+    "code": "EDJCTY00008",
+    "name": "Itanagar",
+    "state_code": "EDJSTA00002"
+  },
+  {
+    "code": "EDJCTY00009",
+    "name": "Naharlagun",
+    "state_code": "EDJSTA00002"
+  },
+  {
+    "code": "EDJCTY00010",
+    "name": "Pasighat",
+    "state_code": "EDJSTA00002"
+  },
+  {
+    "code": "EDJCTY00011",
+    "name": "Tawang",
+    "state_code": "EDJSTA00002"
+  },
+  {
+    "code": "EDJCTY00012",
+    "name": "Guwahati",
+    "state_code": "EDJSTA00003"
+  },
+  {
+    "code": "EDJCTY00013",
+    "name": "Dibrugarh",
+    "state_code": "EDJSTA00003"
+  },
+  {
+    "code": "EDJCTY00014",
+    "name": "Silchar",
+    "state_code": "EDJSTA00003"
+  },
+  {
+    "code": "EDJCTY00015",
+    "name": "Jorhat",
+    "state_code": "EDJSTA00003"
+  },
+  {
+    "code": "EDJCTY00016",
+    "name": "Tezpur",
+    "state_code": "EDJSTA00003"
+  },
+  {
+    "code": "EDJCTY00017",
+    "name": "Nagaon",
+    "state_code": "EDJSTA00003"
+  },
+  {
+    "code": "EDJCTY00018",
+    "name": "Patna",
+    "state_code": "EDJSTA00004"
+  },
+  {
+    "code": "EDJCTY00019",
+    "name": "Gaya",
+    "state_code": "EDJSTA00004"
+  },
+  {
+    "code": "EDJCTY00020",
+    "name": "Bhagalpur",
+    "state_code": "EDJSTA00004"
+  },
+  {
+    "code": "EDJCTY00021",
+    "name": "Muzaffarpur",
+    "state_code": "EDJSTA00004"
+  },
+  {
+    "code": "EDJCTY00022",
+    "name": "Darbhanga",
+    "state_code": "EDJSTA00004"
+  },
+  {
+    "code": "EDJCTY00023",
+    "name": "Purnia",
+    "state_code": "EDJSTA00004"
+  },
+  {
+    "code": "EDJCTY00024",
+    "name": "Arrah",
+    "state_code": "EDJSTA00004"
+  },
+  {
+    "code": "EDJCTY00025",
+    "name": "Raipur",
+    "state_code": "EDJSTA00005"
+  },
+  {
+    "code": "EDJCTY00026",
+    "name": "Bhilai",
+    "state_code": "EDJSTA00005"
+  },
+  {
+    "code": "EDJCTY00027",
+    "name": "Bilaspur",
+    "state_code": "EDJSTA00005"
+  },
+  {
+    "code": "EDJCTY00028",
+    "name": "Korba",
+    "state_code": "EDJSTA00005"
+  },
+  {
+    "code": "EDJCTY00029",
+    "name": "Durg",
+    "state_code": "EDJSTA00005"
+  },
+  {
+    "code": "EDJCTY00030",
+    "name": "Rajnandgaon",
+    "state_code": "EDJSTA00005"
+  },
+  {
+    "code": "EDJCTY00031",
+    "name": "Panaji",
+    "state_code": "EDJSTA00006"
+  },
+  {
+    "code": "EDJCTY00032",
+    "name": "Margao",
+    "state_code": "EDJSTA00006"
+  },
+  {
+    "code": "EDJCTY00033",
+    "name": "Vasco da Gama",
+    "state_code": "EDJSTA00006"
+  },
+  {
+    "code": "EDJCTY00034",
+    "name": "Mapusa",
+    "state_code": "EDJSTA00006"
+  },
+  {
+    "code": "EDJCTY00035",
+    "name": "Ponda",
+    "state_code": "EDJSTA00006"
+  },
+  {
+    "code": "EDJCTY00036",
+    "name": "Ahmedabad",
+    "state_code": "EDJSTA00007"
+  },
+  {
+    "code": "EDJCTY00037",
+    "name": "Surat",
+    "state_code": "EDJSTA00007"
+  },
+  {
+    "code": "EDJCTY00038",
+    "name": "Vadodara",
+    "state_code": "EDJSTA00007"
+  },
+  {
+    "code": "EDJCTY00039",
+    "name": "Rajkot",
+    "state_code": "EDJSTA00007"
+  },
+  {
+    "code": "EDJCTY00040",
+    "name": "Bhavnagar",
+    "state_code": "EDJSTA00007"
+  },
+  {
+    "code": "EDJCTY00041",
+    "name": "Jamnagar",
+    "state_code": "EDJSTA00007"
+  },
+  {
+    "code": "EDJCTY00042",
+    "name": "Gandhinagar",
+    "state_code": "EDJSTA00007"
+  },
+  {
+    "code": "EDJCTY00043",
+    "name": "Anand",
+    "state_code": "EDJSTA00007"
+  },
+  {
+    "code": "EDJCTY00044",
+    "name": "Gurugram",
+    "state_code": "EDJSTA00008"
+  },
+  {
+    "code": "EDJCTY00045",
+    "name": "Faridabad",
+    "state_code": "EDJSTA00008"
+  },
+  {
+    "code": "EDJCTY00046",
+    "name": "Panipat",
+    "state_code": "EDJSTA00008"
+  },
+  {
+    "code": "EDJCTY00047",
+    "name": "Ambala",
+    "state_code": "EDJSTA00008"
+  },
+  {
+    "code": "EDJCTY00048",
+    "name": "Karnal",
+    "state_code": "EDJSTA00008"
+  },
+  {
+    "code": "EDJCTY00049",
+    "name": "Hisar",
+    "state_code": "EDJSTA00008"
+  },
+  {
+    "code": "EDJCTY00050",
+    "name": "Rohtak",
+    "state_code": "EDJSTA00008"
+  },
+  {
+    "code": "EDJCTY00051",
+    "name": "Sonipat",
+    "state_code": "EDJSTA00008"
+  },
+  {
+    "code": "EDJCTY00052",
+    "name": "Shimla",
+    "state_code": "EDJSTA00009"
+  },
+  {
+    "code": "EDJCTY00053",
+    "name": "Dharamshala",
+    "state_code": "EDJSTA00009"
+  },
+  {
+    "code": "EDJCTY00054",
+    "name": "Mandi",
+    "state_code": "EDJSTA00009"
+  },
+  {
+    "code": "EDJCTY00055",
+    "name": "Solan",
+    "state_code": "EDJSTA00009"
+  },
+  {
+    "code": "EDJCTY00056",
+    "name": "Kullu",
+    "state_code": "EDJSTA00009"
+  },
+  {
+    "code": "EDJCTY00057",
+    "name": "Hamirpur",
+    "state_code": "EDJSTA00009"
+  },
+  {
+    "code": "EDJCTY00058",
+    "name": "Ranchi",
+    "state_code": "EDJSTA00010"
+  },
+  {
+    "code": "EDJCTY00059",
+    "name": "Jamshedpur",
+    "state_code": "EDJSTA00010"
+  },
+  {
+    "code": "EDJCTY00060",
+    "name": "Dhanbad",
+    "state_code": "EDJSTA00010"
+  },
+  {
+    "code": "EDJCTY00061",
+    "name": "Bokaro Steel City",
+    "state_code": "EDJSTA00010"
+  },
+  {
+    "code": "EDJCTY00062",
+    "name": "Hazaribagh",
+    "state_code": "EDJSTA00010"
+  },
+  {
+    "code": "EDJCTY00063",
+    "name": "Deoghar",
+    "state_code": "EDJSTA00010"
+  },
+  {
+    "code": "EDJCTY00064",
+    "name": "Bengaluru",
+    "state_code": "EDJSTA00011"
+  },
+  {
+    "code": "EDJCTY00065",
+    "name": "Mysuru",
+    "state_code": "EDJSTA00011"
+  },
+  {
+    "code": "EDJCTY00066",
+    "name": "Mangaluru",
+    "state_code": "EDJSTA00011"
+  },
+  {
+    "code": "EDJCTY00067",
+    "name": "Hubballi",
+    "state_code": "EDJSTA00011"
+  },
+  {
+    "code": "EDJCTY00068",
+    "name": "Belagavi",
+    "state_code": "EDJSTA00011"
+  },
+  {
+    "code": "EDJCTY00069",
+    "name": "Kalaburagi",
+    "state_code": "EDJSTA00011"
+  },
+  {
+    "code": "EDJCTY00070",
+    "name": "Davanagere",
+    "state_code": "EDJSTA00011"
+  },
+  {
+    "code": "EDJCTY00071",
+    "name": "Udupi",
+    "state_code": "EDJSTA00011"
+  },
+  {
+    "code": "EDJCTY00072",
+    "name": "Thiruvananthapuram",
+    "state_code": "EDJSTA00012"
+  },
+  {
+    "code": "EDJCTY00073",
+    "name": "Kochi",
+    "state_code": "EDJSTA00012"
+  },
+  {
+    "code": "EDJCTY00074",
+    "name": "Kozhikode",
+    "state_code": "EDJSTA00012"
+  },
+  {
+    "code": "EDJCTY00075",
+    "name": "Thrissur",
+    "state_code": "EDJSTA00012"
+  },
+  {
+    "code": "EDJCTY00076",
+    "name": "Kollam",
+    "state_code": "EDJSTA00012"
+  },
+  {
+    "code": "EDJCTY00077",
+    "name": "Kannur",
+    "state_code": "EDJSTA00012"
+  },
+  {
+    "code": "EDJCTY00078",
+    "name": "Kottayam",
+    "state_code": "EDJSTA00012"
+  },
+  {
+    "code": "EDJCTY00079",
+    "name": "Bhopal",
+    "state_code": "EDJSTA00013"
+  },
+  {
+    "code": "EDJCTY00080",
+    "name": "Indore",
+    "state_code": "EDJSTA00013"
+  },
+  {
+    "code": "EDJCTY00081",
+    "name": "Gwalior",
+    "state_code": "EDJSTA00013"
+  },
+  {
+    "code": "EDJCTY00082",
+    "name": "Jabalpur",
+    "state_code": "EDJSTA00013"
+  },
+  {
+    "code": "EDJCTY00083",
+    "name": "Ujjain",
+    "state_code": "EDJSTA00013"
+  },
+  {
+    "code": "EDJCTY00084",
+    "name": "Sagar",
+    "state_code": "EDJSTA00013"
+  },
+  {
+    "code": "EDJCTY00085",
+    "name": "Rewa",
+    "state_code": "EDJSTA00013"
+  },
+  {
+    "code": "EDJCTY00086",
+    "name": "Mumbai",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00087",
+    "name": "Pune",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00088",
+    "name": "Nagpur",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00089",
+    "name": "Nashik",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00090",
+    "name": "Chhatrapati Sambhajinagar",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00091",
+    "name": "Thane",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00092",
+    "name": "Navi Mumbai",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00093",
+    "name": "Kolhapur",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00094",
+    "name": "Solapur",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00095",
+    "name": "Amravati",
+    "state_code": "EDJSTA00014"
+  },
+  {
+    "code": "EDJCTY00096",
+    "name": "Imphal",
+    "state_code": "EDJSTA00015"
+  },
+  {
+    "code": "EDJCTY00097",
+    "name": "Thoubal",
+    "state_code": "EDJSTA00015"
+  },
+  {
+    "code": "EDJCTY00098",
+    "name": "Churachandpur",
+    "state_code": "EDJSTA00015"
+  },
+  {
+    "code": "EDJCTY00099",
+    "name": "Shillong",
+    "state_code": "EDJSTA00016"
+  },
+  {
+    "code": "EDJCTY00100",
+    "name": "Tura",
+    "state_code": "EDJSTA00016"
+  },
+  {
+    "code": "EDJCTY00101",
+    "name": "Jowai",
+    "state_code": "EDJSTA00016"
+  },
+  {
+    "code": "EDJCTY00102",
+    "name": "Aizawl",
+    "state_code": "EDJSTA00017"
+  },
+  {
+    "code": "EDJCTY00103",
+    "name": "Lunglei",
+    "state_code": "EDJSTA00017"
+  },
+  {
+    "code": "EDJCTY00104",
+    "name": "Champhai",
+    "state_code": "EDJSTA00017"
+  },
+  {
+    "code": "EDJCTY00105",
+    "name": "Kohima",
+    "state_code": "EDJSTA00018"
+  },
+  {
+    "code": "EDJCTY00106",
+    "name": "Dimapur",
+    "state_code": "EDJSTA00018"
+  },
+  {
+    "code": "EDJCTY00107",
+    "name": "Mokokchung",
+    "state_code": "EDJSTA00018"
+  },
+  {
+    "code": "EDJCTY00108",
+    "name": "Bhubaneswar",
+    "state_code": "EDJSTA00019"
+  },
+  {
+    "code": "EDJCTY00109",
+    "name": "Cuttack",
+    "state_code": "EDJSTA00019"
+  },
+  {
+    "code": "EDJCTY00110",
+    "name": "Rourkela",
+    "state_code": "EDJSTA00019"
+  },
+  {
+    "code": "EDJCTY00111",
+    "name": "Berhampur",
+    "state_code": "EDJSTA00019"
+  },
+  {
+    "code": "EDJCTY00112",
+    "name": "Sambalpur",
+    "state_code": "EDJSTA00019"
+  },
+  {
+    "code": "EDJCTY00113",
+    "name": "Puri",
+    "state_code": "EDJSTA00019"
+  },
+  {
+    "code": "EDJCTY00114",
+    "name": "Ludhiana",
+    "state_code": "EDJSTA00020"
+  },
+  {
+    "code": "EDJCTY00115",
+    "name": "Amritsar",
+    "state_code": "EDJSTA00020"
+  },
+  {
+    "code": "EDJCTY00116",
+    "name": "Jalandhar",
+    "state_code": "EDJSTA00020"
+  },
+  {
+    "code": "EDJCTY00117",
+    "name": "Patiala",
+    "state_code": "EDJSTA00020"
+  },
+  {
+    "code": "EDJCTY00118",
+    "name": "Bathinda",
+    "state_code": "EDJSTA00020"
+  },
+  {
+    "code": "EDJCTY00119",
+    "name": "Mohali",
+    "state_code": "EDJSTA00020"
+  },
+  {
+    "code": "EDJCTY00120",
+    "name": "Jaipur",
+    "state_code": "EDJSTA00021"
+  },
+  {
+    "code": "EDJCTY00121",
+    "name": "Jodhpur",
+    "state_code": "EDJSTA00021"
+  },
+  {
+    "code": "EDJCTY00122",
+    "name": "Udaipur",
+    "state_code": "EDJSTA00021"
+  },
+  {
+    "code": "EDJCTY00123",
+    "name": "Kota",
+    "state_code": "EDJSTA00021"
+  },
+  {
+    "code": "EDJCTY00124",
+    "name": "Ajmer",
+    "state_code": "EDJSTA00021"
+  },
+  {
+    "code": "EDJCTY00125",
+    "name": "Bikaner",
+    "state_code": "EDJSTA00021"
+  },
+  {
+    "code": "EDJCTY00126",
+    "name": "Alwar",
+    "state_code": "EDJSTA00021"
+  },
+  {
+    "code": "EDJCTY00127",
+    "name": "Sikar",
+    "state_code": "EDJSTA00021"
+  },
+  {
+    "code": "EDJCTY00128",
+    "name": "Gangtok",
+    "state_code": "EDJSTA00022"
+  },
+  {
+    "code": "EDJCTY00129",
+    "name": "Namchi",
+    "state_code": "EDJSTA00022"
+  },
+  {
+    "code": "EDJCTY00130",
+    "name": "Gyalshing",
+    "state_code": "EDJSTA00022"
+  },
+  {
+    "code": "EDJCTY00131",
+    "name": "Chennai",
+    "state_code": "EDJSTA00023"
+  },
+  {
+    "code": "EDJCTY00132",
+    "name": "Coimbatore",
+    "state_code": "EDJSTA00023"
+  },
+  {
+    "code": "EDJCTY00133",
+    "name": "Madurai",
+    "state_code": "EDJSTA00023"
+  },
+  {
+    "code": "EDJCTY00134",
+    "name": "Tiruchirappalli",
+    "state_code": "EDJSTA00023"
+  },
+  {
+    "code": "EDJCTY00135",
+    "name": "Salem",
+    "state_code": "EDJSTA00023"
+  },
+  {
+    "code": "EDJCTY00136",
+    "name": "Tirunelveli",
+    "state_code": "EDJSTA00023"
+  },
+  {
+    "code": "EDJCTY00137",
+    "name": "Vellore",
+    "state_code": "EDJSTA00023"
+  },
+  {
+    "code": "EDJCTY00138",
+    "name": "Erode",
+    "state_code": "EDJSTA00023"
+  },
+  {
+    "code": "EDJCTY00139",
+    "name": "Hyderabad",
+    "state_code": "EDJSTA00024"
+  },
+  {
+    "code": "EDJCTY00140",
+    "name": "Secunderabad",
+    "state_code": "EDJSTA00024"
+  },
+  {
+    "code": "EDJCTY00141",
+    "name": "Warangal",
+    "state_code": "EDJSTA00024"
+  },
+  {
+    "code": "EDJCTY00142",
+    "name": "Nizamabad",
+    "state_code": "EDJSTA00024"
+  },
+  {
+    "code": "EDJCTY00143",
+    "name": "Karimnagar",
+    "state_code": "EDJSTA00024"
+  },
+  {
+    "code": "EDJCTY00144",
+    "name": "Khammam",
+    "state_code": "EDJSTA00024"
+  },
+  {
+    "code": "EDJCTY00145",
+    "name": "Agartala",
+    "state_code": "EDJSTA00025"
+  },
+  {
+    "code": "EDJCTY00146",
+    "name": "Udaipur",
+    "state_code": "EDJSTA00025"
+  },
+  {
+    "code": "EDJCTY00147",
+    "name": "Dharmanagar",
+    "state_code": "EDJSTA00025"
+  },
+  {
+    "code": "EDJCTY00148",
+    "name": "Lucknow",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00149",
+    "name": "Kanpur",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00150",
+    "name": "Noida",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00151",
+    "name": "Greater Noida",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00152",
+    "name": "Ghaziabad",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00153",
+    "name": "Agra",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00154",
+    "name": "Varanasi",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00155",
+    "name": "Prayagraj",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00156",
+    "name": "Meerut",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00157",
+    "name": "Bareilly",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00158",
+    "name": "Aligarh",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00159",
+    "name": "Moradabad",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00160",
+    "name": "Gorakhpur",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00161",
+    "name": "Mathura",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00162",
+    "name": "Jhansi",
+    "state_code": "EDJSTA00026"
+  },
+  {
+    "code": "EDJCTY00163",
+    "name": "Dehradun",
+    "state_code": "EDJSTA00027"
+  },
+  {
+    "code": "EDJCTY00164",
+    "name": "Haridwar",
+    "state_code": "EDJSTA00027"
+  },
+  {
+    "code": "EDJCTY00165",
+    "name": "Roorkee",
+    "state_code": "EDJSTA00027"
+  },
+  {
+    "code": "EDJCTY00166",
+    "name": "Haldwani",
+    "state_code": "EDJSTA00027"
+  },
+  {
+    "code": "EDJCTY00167",
+    "name": "Rishikesh",
+    "state_code": "EDJSTA00027"
+  },
+  {
+    "code": "EDJCTY00168",
+    "name": "Nainital",
+    "state_code": "EDJSTA00027"
+  },
+  {
+    "code": "EDJCTY00169",
+    "name": "Kolkata",
+    "state_code": "EDJSTA00028"
+  },
+  {
+    "code": "EDJCTY00170",
+    "name": "Howrah",
+    "state_code": "EDJSTA00028"
+  },
+  {
+    "code": "EDJCTY00171",
+    "name": "Durgapur",
+    "state_code": "EDJSTA00028"
+  },
+  {
+    "code": "EDJCTY00172",
+    "name": "Asansol",
+    "state_code": "EDJSTA00028"
+  },
+  {
+    "code": "EDJCTY00173",
+    "name": "Siliguri",
+    "state_code": "EDJSTA00028"
+  },
+  {
+    "code": "EDJCTY00174",
+    "name": "Kharagpur",
+    "state_code": "EDJSTA00028"
+  },
+  {
+    "code": "EDJCTY00175",
+    "name": "Port Blair",
+    "state_code": "EDJSTA00029"
+  },
+  {
+    "code": "EDJCTY00176",
+    "name": "Chandigarh",
+    "state_code": "EDJSTA00030"
+  },
+  {
+    "code": "EDJCTY00177",
+    "name": "Daman",
+    "state_code": "EDJSTA00031"
+  },
+  {
+    "code": "EDJCTY00178",
+    "name": "Diu",
+    "state_code": "EDJSTA00031"
+  },
+  {
+    "code": "EDJCTY00179",
+    "name": "Silvassa",
+    "state_code": "EDJSTA00031"
+  },
+  {
+    "code": "EDJCTY00180",
+    "name": "New Delhi",
+    "state_code": "EDJSTA00032"
+  },
+  {
+    "code": "EDJCTY00181",
+    "name": "Central Delhi",
+    "state_code": "EDJSTA00032"
+  },
+  {
+    "code": "EDJCTY00182",
+    "name": "North Delhi",
+    "state_code": "EDJSTA00032"
+  },
+  {
+    "code": "EDJCTY00183",
+    "name": "South Delhi",
+    "state_code": "EDJSTA00032"
+  },
+  {
+    "code": "EDJCTY00184",
+    "name": "East Delhi",
+    "state_code": "EDJSTA00032"
+  },
+  {
+    "code": "EDJCTY00185",
+    "name": "West Delhi",
+    "state_code": "EDJSTA00032"
+  },
+  {
+    "code": "EDJCTY00186",
+    "name": "Dwarka",
+    "state_code": "EDJSTA00032"
+  },
+  {
+    "code": "EDJCTY00187",
+    "name": "Rohini",
+    "state_code": "EDJSTA00032"
+  },
+  {
+    "code": "EDJCTY00188",
+    "name": "Srinagar",
+    "state_code": "EDJSTA00033"
+  },
+  {
+    "code": "EDJCTY00189",
+    "name": "Jammu",
+    "state_code": "EDJSTA00033"
+  },
+  {
+    "code": "EDJCTY00190",
+    "name": "Anantnag",
+    "state_code": "EDJSTA00033"
+  },
+  {
+    "code": "EDJCTY00191",
+    "name": "Baramulla",
+    "state_code": "EDJSTA00033"
+  },
+  {
+    "code": "EDJCTY00192",
+    "name": "Udhampur",
+    "state_code": "EDJSTA00033"
+  },
+  {
+    "code": "EDJCTY00193",
+    "name": "Leh",
+    "state_code": "EDJSTA00034"
+  },
+  {
+    "code": "EDJCTY00194",
+    "name": "Kargil",
+    "state_code": "EDJSTA00034"
+  },
+  {
+    "code": "EDJCTY00195",
+    "name": "Kavaratti",
+    "state_code": "EDJSTA00035"
+  },
+  {
+    "code": "EDJCTY00196",
+    "name": "Puducherry",
+    "state_code": "EDJSTA00036"
+  },
+  {
+    "code": "EDJCTY00197",
+    "name": "Karaikal",
+    "state_code": "EDJSTA00036"
+  },
+  {
+    "code": "EDJCTY00198",
+    "name": "Mahe",
+    "state_code": "EDJSTA00036"
+  },
+  {
+    "code": "EDJCTY00199",
+    "name": "Yanam",
+    "state_code": "EDJSTA00036"
+  }
+]

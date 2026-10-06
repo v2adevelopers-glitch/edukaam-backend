@@ -1,0 +1,14 @@
+{
+    "PORT": 8080,
+    "SERVER_STARTED": "UAT Server Started",
+    "COMP_NAME": "EduJobs Backend",
+    "ENABLE_CRON": false,
+    "FRONTEND_BASE_URL": "http://localhost:3000",
+    "TRUST_PROXY": 1,
+    "RATE_LIMIT": {
+        "LOGIN_WINDOW_MINUTES": 15,
+        "LOGIN_MAX": 20,
+        "REGISTER_WINDOW_MINUTES": 60,
+        "REGISTER_MAX": 10
+    }
+}

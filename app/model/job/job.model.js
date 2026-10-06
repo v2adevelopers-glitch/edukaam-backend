@@ -1,0 +1,45 @@
+module.exports = (sequelize, DataTypes) => {
+    const Job = sequelize.define("job", {
+        id: { type: DataTypes.INTEGER, primaryKey: true, allowNull: false, autoIncrement: true },
+        code: { type: DataTypes.STRING(20), allowNull: false },
+        provider_user_code: { type: DataTypes.STRING(20), allowNull: false },      // FK: users.code
+        job_category_code: { type: DataTypes.STRING(20), allowNull: false },       // FK: job_categories.code
+        title: { type: DataTypes.STRING(200), allowNull: false },
+        job_type: { type: DataTypes.ENUM('full_time', 'part_time', 'contract', 'visiting'), allowNull: false, defaultValue: 'full_time' },
+        vacancies: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+        hired_count: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+        min_qualification: { type: DataTypes.STRING(150), allowNull: true },
+        min_experience_years: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+        salary_min: { type: DataTypes.DECIMAL(12, 2), allowNull: false },          // monthly, INR
+        salary_max: { type: DataTypes.DECIMAL(12, 2), allowNull: false },
+        state_code: { type: DataTypes.STRING(20), allowNull: false },              // FK: states.code
+        city_code: { type: DataTypes.STRING(20), allowNull: false },               // FK: cities.code
+        last_date: { type: DataTypes.DATEONLY, allowNull: false },
+        description: { type: DataTypes.TEXT, allowNull: true },
+        // hiring state; the audit status column below stays active/inactive
+        job_status: { type: DataTypes.ENUM('open', 'closed'), allowNull: false, defaultValue: 'open' },
+        status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
+        created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        created_by: { type: DataTypes.INTEGER, allowNull: true },
+        modified_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
+        modified_by: { type: DataTypes.INTEGER, allowNull: true },
+        ip_address: { type: DataTypes.STRING(45), allowNull: true },
+        deleted: { type: DataTypes.BOOLEAN, defaultValue: false }
+    }, {
+        timestamps: false,
+        tableName: "jobs",
+        indexes: [
+            { fields: ['code'], name: 'idx_job_code', unique: true },
+            { fields: ['provider_user_code'], name: 'idx_job_provider_user_code' },
+            { fields: ['job_category_code'], name: 'idx_job_job_category_code' },
+            { fields: ['job_status'], name: 'idx_job_job_status' },
+            { fields: ['job_type'], name: 'idx_job_job_type' },
+            { fields: ['state_code'], name: 'idx_job_state_code' },
+            { fields: ['city_code'], name: 'idx_job_city_code' },
+            { fields: ['last_date'], name: 'idx_job_last_date' },
+            { fields: ['status'], name: 'idx_job_status' }
+        ]
+    });
+
+    return Job;
+};

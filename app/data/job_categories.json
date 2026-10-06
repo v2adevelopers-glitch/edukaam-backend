@@ -1,0 +1,50 @@
+[
+  {
+    "code": "EDJCAT00001",
+    "name": "Primary Teacher"
+  },
+  {
+    "code": "EDJCAT00002",
+    "name": "Secondary Teacher"
+  },
+  {
+    "code": "EDJCAT00003",
+    "name": "Lecturer"
+  },
+  {
+    "code": "EDJCAT00004",
+    "name": "Professor"
+  },
+  {
+    "code": "EDJCAT00005",
+    "name": "Coaching Faculty"
+  },
+  {
+    "code": "EDJCAT00006",
+    "name": "Principal"
+  },
+  {
+    "code": "EDJCAT00007",
+    "name": "Librarian"
+  },
+  {
+    "code": "EDJCAT00008",
+    "name": "Lab Assistant"
+  },
+  {
+    "code": "EDJCAT00009",
+    "name": "Office Staff"
+  },
+  {
+    "code": "EDJCAT00010",
+    "name": "Driver"
+  },
+  {
+    "code": "EDJCAT00011",
+    "name": "Security Guard"
+  },
+  {
+    "code": "EDJCAT00012",
+    "name": "Peon"
+  }
+]
