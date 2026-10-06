@@ -21,6 +21,9 @@ router.route("/applications/:applicationid")
     .get(protect, provider, validateParams(applicationSchemas.applicationid), applicationCtrl.getSingleApplication)
     .patch(protect, provider, checkApiModuleAccess, validateParams(applicationSchemas.applicationid), validateBody(applicationSchemas.updateApplicationStatus), applicationCtrl.updateApplicationStatus);
 
+router.route("/applications/:applicationid/resume")
+    .get(protect, provider, validateParams(applicationSchemas.applicationid), applicationCtrl.downloadApplicantResume);
+
 // =====================
 // SEEKER APPLICATIONS ROUTES
 // =====================

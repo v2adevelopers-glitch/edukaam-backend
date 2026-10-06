@@ -17,6 +17,13 @@ exports.errorResponse = (res, handlerName, error) => {
     });
 };
 
+// Sends a stored file as a download; errors before any byte is sent still use the envelope
+exports.fileResponse = (res, handlerName, filePath, downloadName) => {
+    res.download(filePath, downloadName, (err) => {
+        if (err && !res.headersSent) exports.errorResponse(res, handlerName, err);
+    });
+};
+
 // statusCode is 200 except where a route documents otherwise (201 for registration)
 exports.successResponse = (res, message, resData, statusCode = 200) => {
     res.status(statusCode).json({

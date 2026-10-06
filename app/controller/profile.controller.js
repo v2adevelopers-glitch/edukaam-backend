@@ -1,5 +1,5 @@
 const CustomError = require('../lib/custom.error');
-const { errorResponse, successResponse } = require('../lib/response.handler');
+const { errorResponse, successResponse, fileResponse } = require('../lib/response.handler');
 const profileService = require('../service/profile.service');
 const userService = require('../service/user.service');
 const { assertMasterCodes, assertCityInState } = require('../helper/master.helper');
@@ -117,11 +117,81 @@ const updateSeekerProfile = async (req, res) => {
     }
 };
 
+// ─── Files ────────────────────────────────────────────────────────────────
+
+const uploadResume = async (req, res) => {
+    try {
+        const saved = await profileService.setSeekerResume(req.user.code, req.file, getMeta(req));
+        if (!saved) {
+            throw new CustomError('profile_not_found', 404, "Seeker profile not found");
+        }
+        const profile_res = await profileService.getSeekerProfileByUserCode(req.user.code);
+        successResponse(res, "Resume uploaded successfully", { profile_res });
+    } catch (err) {
+        errorResponse(res, 'uploadResume', err);
+    }
+};
+
+const downloadResume = async (req, res) => {
+    try {
+        const file = await profileService.getSeekerResumeFile(req.user.code);
+        if (!file) {
+            throw new CustomError('resume_not_found', 404, "No resume uploaded");
+        }
+        fileResponse(res, 'downloadResume', file.path, file.name);
+    } catch (err) {
+        errorResponse(res, 'downloadResume', err);
+    }
+};
+
+const deleteResume = async (req, res) => {
+    try {
+        const removed = await profileService.removeSeekerResume(req.user.code, getMeta(req));
+        if (!removed) {
+            throw new CustomError('resume_not_found', 404, "No resume uploaded");
+        }
+        successResponse(res, "Resume deleted successfully");
+    } catch (err) {
+        errorResponse(res, 'deleteResume', err);
+    }
+};
+
+const uploadLogo = async (req, res) => {
+    try {
+        const saved = await profileService.setProviderLogo(req.user.code, req.file, getMeta(req));
+        if (!saved) {
+            throw new CustomError('profile_not_found', 404, "Provider profile not found");
+        }
+        const profile_res = await profileService.getProviderProfileByUserCode(req.user.code);
+        successResponse(res, "Logo uploaded successfully", { profile_res });
+    } catch (err) {
+        errorResponse(res, 'uploadLogo', err);
+    }
+};
+
+const deleteLogo = async (req, res) => {
+    try {
+        const removed = await profileService.removeProviderLogo(req.user.code, getMeta(req));
+        if (!removed) {
+            throw new CustomError('logo_not_found', 404, "No logo uploaded");
+        }
+        successResponse(res, "Logo deleted successfully");
+    } catch (err) {
+        errorResponse(res, 'deleteLogo', err);
+    }
+};
+
 module.exports = {
     // Provider profile
     getProviderProfile,
     updateProviderProfile,
     // Seeker profile
     getSeekerProfile,
-    updateSeekerProfile
+    updateSeekerProfile,
+    // Files
+    uploadResume,
+    downloadResume,
+    deleteResume,
+    uploadLogo,
+    deleteLogo
 };

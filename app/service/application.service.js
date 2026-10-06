@@ -2,6 +2,7 @@ const db = require('../model');
 const jobService = require('./job.service');
 const codeGenerator = require('../helper/code_generator.helper');
 const { APPLICATION_STATUS, JOB_STATUS } = require('../constants/job.constant');
+const { LOGO_URL_PREFIX } = require('../constants/file.constant');
 
 const nameOnly = ['code', 'name'];
 
@@ -38,8 +39,8 @@ const providerIncludes = (withFullProfile) => [
             as: 'seekerProfile',
             attributes: withFullProfile
                 ? ['job_category_code', 'gender', 'date_of_birth', 'qualification', 'experience_years', 'skills',
-                    'expected_salary', 'state_code', 'city_code', 'about']
-                : ['qualification', 'experience_years'],
+                    'expected_salary', 'state_code', 'city_code', 'about', 'resume_file', 'resume_name']
+                : ['qualification', 'experience_years', 'resume_file'],
             include: withFullProfile ? [
                 { model: db.jobCategory, as: 'jobCategory', attributes: nameOnly },
                 { model: db.state, as: 'state', attributes: nameOnly },
@@ -63,6 +64,7 @@ const formatProviderApplication = (row) => {
         applicant_email: row.seeker.email,
         experience_years: profile ? profile.experience_years : null,
         qualification: profile ? profile.qualification : null,
+        has_resume: !!(profile && profile.resume_file),
         application_status: row.application_status,
         applied_at: row.applied_at,
         status_changed_at: row.status_changed_at
@@ -98,7 +100,9 @@ const formatProviderApplicationDetail = (row) => {
             state_name: profile && profile.state ? profile.state.name : null,
             city_code: profile ? profile.city_code : null,
             city_name: profile && profile.city ? profile.city.name : null,
-            about: profile ? profile.about : null
+            about: profile ? profile.about : null,
+            has_resume: !!(profile && profile.resume_file),
+            resume_name: profile ? profile.resume_name : null
         }
     };
 };
@@ -226,7 +230,7 @@ const seekerIncludes = [{
             include: [{
                 model: db.providerProfile,
                 as: 'providerProfile',
-                attributes: ['institution_name', 'institution_type_code'],
+                attributes: ['institution_name', 'institution_type_code', 'logo_file', 'verified_at'],
                 include: [{ model: db.institutionType, as: 'institutionType', attributes: nameOnly }]
             }]
         }
@@ -246,6 +250,8 @@ const formatSeekerApplication = (row) => {
         institution_name: profile ? profile.institution_name : null,
         institution_type_code: profile ? profile.institution_type_code : null,
         institution_type_name: profile && profile.institutionType ? profile.institutionType.name : null,
+        institution_logo_url: profile && profile.logo_file ? LOGO_URL_PREFIX + profile.logo_file : null,
+        institution_verified: !!(profile && profile.verified_at),
         state_code: job.state_code,
         state_name: job.state ? job.state.name : null,
         city_code: job.city_code,

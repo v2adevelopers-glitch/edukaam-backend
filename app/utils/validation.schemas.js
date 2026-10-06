@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const { REGISTRABLE_ROLE_KEYS } = require('../constants/role.constant');
+const { STORED_FILE_PATTERN } = require('../constants/file.constant');
 const { JOB_TYPES, JOB_STATUS, APPLICATION_STATUSES, PROVIDER_SETTABLE_STATUSES, GENDERS } = require('../constants/job.constant');
 
 // Common validation patterns
@@ -288,5 +289,13 @@ exports.applicationSchemas = {
 
     createApplication: Joi.object({
         job_code: businessCode.required()
+    })
+};
+
+// ─── Public ───────────────────────────────────────────────────────────────
+
+exports.publicSchemas = {
+    filename: Joi.object({
+        filename: Joi.string().pattern(STORED_FILE_PATTERN).required()
     })
 };

@@ -156,7 +156,8 @@
       "module": "provider-profile",
       "menu_access": true,
       "read_access": true,
-      "update_access": true
+      "update_access": true,
+      "delete_access": true
     },
     {
       "role_code": 1002,
@@ -185,7 +186,8 @@
       "module": "seeker-profile",
       "menu_access": true,
       "read_access": true,
-      "update_access": true
+      "update_access": true,
+      "delete_access": true
     },
     {
       "role_code": 1003,
@@ -379,6 +381,30 @@
       "api_endpoint": "/api/v1/users/verify/confirm",
       "api_method": "POST",
       "api_slug": "confirm-verification"
+    },
+    {
+      "module": "provider-profile",
+      "api_endpoint": "/api/v1/profile/provider/me/logo",
+      "api_method": "PUT",
+      "api_slug": "upload-logo"
+    },
+    {
+      "module": "provider-profile",
+      "api_endpoint": "/api/v1/profile/provider/me/logo",
+      "api_method": "DELETE",
+      "api_slug": "delete-logo"
+    },
+    {
+      "module": "seeker-profile",
+      "api_endpoint": "/api/v1/profile/seeker/me/resume",
+      "api_method": "PUT",
+      "api_slug": "upload-resume"
+    },
+    {
+      "module": "seeker-profile",
+      "api_endpoint": "/api/v1/profile/seeker/me/resume",
+      "api_method": "DELETE",
+      "api_slug": "delete-resume"
     }
   ]
 }

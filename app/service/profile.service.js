@@ -3,6 +3,8 @@ const userService = require('./user.service');
 const { ROLE_CODES } = require('../constants/role.constant');
 const { emptyToNull, isUniqueViolationOn } = require('../helper/common.helper');
 const { toDateOnly } = require('../helper/query.helper');
+const fileStorage = require('../helper/file_storage.helper');
+const { UPLOADS, LOGO_URL_PREFIX } = require('../constants/file.constant');
 
 const nameOnly = ['code', 'name'];
 
@@ -38,6 +40,8 @@ const formatProviderProfile = (p) => {
         city_code: p.city_code,
         city_name: p.city ? p.city.name : null,
         pincode: p.pincode,
+        logo_url: p.logo_file ? LOGO_URL_PREFIX + p.logo_file : null,
+        institution_verified: !!p.verified_at,
         modified_at: p.modified_at
     };
 };
@@ -59,6 +63,9 @@ const formatSeekerProfile = (p) => {
         city_code: p.city_code,
         city_name: p.city ? p.city.name : null,
         about: p.about,
+        has_resume: !!p.resume_file,
+        resume_name: p.resume_name || null,
+        resume_uploaded_at: p.resume_uploaded_at || null,
         modified_at: p.modified_at
     };
 };
@@ -203,6 +210,107 @@ exports.updateSeekerProfile = async (user_code, payload, meta = {}) => {
             about: emptyToNull(payload.about),
             ...auditOnUpdate(meta)
         }, { where: { user_code, deleted: false }, transaction: t }));
+    } catch (err) {
+        throw err;
+    }
+};
+
+// ─── Files ────────────────────────────────────────────────────────────────
+
+// Stores the new file, points the profile at it, then deletes the file it replaces. A failed
+// DB write removes the new file again, so no orphan or dangling reference is left.
+const replaceProfileFile = async (model, user_code, upload, column, file, extraColumns, meta) => {
+    const existing = await model.findOne({ where: { user_code, deleted: false }, attributes: ['id', column] });
+    if (!existing) return false;
+
+    const fileName = await fileStorage.saveFile(upload.dir, file.buffer, file.detectedType);
+    try {
+        await model.update({
+            [column]: fileName,
+            ...extraColumns,
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { id: existing.id } });
+    } catch (err) {
+        await fileStorage.removeFile(upload.dir, fileName);
+        throw err;
+    }
+    await fileStorage.removeFile(upload.dir, existing[column]);
+    return true;
+};
+
+const clearProfileFile = async (model, user_code, upload, column, extraColumns, meta) => {
+    const existing = await model.findOne({ where: { user_code, deleted: false }, attributes: ['id', column] });
+    if (!existing || !existing[column]) return false;
+
+    await model.update({
+        [column]: null,
+        ...extraColumns,
+        modified_at: new Date(),
+        modified_by: meta.userId || null,
+        ip_address: meta.ip || null
+    }, { where: { id: existing.id } });
+    await fileStorage.removeFile(upload.dir, existing[column]);
+    return true;
+};
+
+exports.setSeekerResume = async (user_code, file, meta = {}) => {
+    try {
+        return await replaceProfileFile(db.seekerProfile, user_code, UPLOADS.RESUME, 'resume_file', file, {
+            resume_name: fileStorage.cleanOriginalName(file.originalname),
+            resume_uploaded_at: new Date()
+        }, meta);
+    } catch (err) {
+        throw err;
+    }
+};
+
+exports.removeSeekerResume = async (user_code, meta = {}) => {
+    try {
+        return await clearProfileFile(db.seekerProfile, user_code, UPLOADS.RESUME, 'resume_file',
+            { resume_name: null, resume_uploaded_at: null }, meta);
+    } catch (err) {
+        throw err;
+    }
+};
+
+// { path, name } of the seeker's resume when the file is really there, else null
+exports.getSeekerResumeFile = async (user_code) => {
+    try {
+        const profile = await db.seekerProfile.findOne({ where: { user_code, deleted: false }, attributes: ['resume_file', 'resume_name'] });
+        const filePath = profile && fileStorage.storedFilePath(UPLOADS.RESUME.dir, profile.resume_file);
+        if (!filePath || !await fileStorage.fileExists(filePath)) return null;
+        return { path: filePath, name: profile.resume_name || `resume.${profile.resume_file.split('.').pop()}` };
+    } catch (err) {
+        throw err;
+    }
+};
+
+exports.setProviderLogo = async (user_code, file, meta = {}) => {
+    try {
+        return await replaceProfileFile(db.providerProfile, user_code, UPLOADS.LOGO, 'logo_file', file, {}, meta);
+    } catch (err) {
+        throw err;
+    }
+};
+
+exports.removeProviderLogo = async (user_code, meta = {}) => {
+    try {
+        return await clearProfileFile(db.providerProfile, user_code, UPLOADS.LOGO, 'logo_file', {}, meta);
+    } catch (err) {
+        throw err;
+    }
+};
+
+// Path of a stored logo that belongs to a live provider profile, else null
+exports.getLogoFile = async (fileName) => {
+    try {
+        const filePath = fileStorage.storedFilePath(UPLOADS.LOGO.dir, fileName);
+        if (!filePath) return null;
+        const owner = await db.providerProfile.findOne({ where: { logo_file: fileName, deleted: false }, attributes: ['id'] });
+        if (!owner || !await fileStorage.fileExists(filePath)) return null;
+        return filePath;
     } catch (err) {
         throw err;
     }

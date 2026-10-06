@@ -4,6 +4,7 @@ const codeGenerator = require('../helper/code_generator.helper');
 const { emptyToNull } = require('../helper/common.helper');
 const { toDateOnly } = require('../helper/query.helper');
 const { JOB_STATUS } = require('../constants/job.constant');
+const { LOGO_URL_PREFIX } = require('../constants/file.constant');
 
 const nameOnly = ['code', 'name'];
 
@@ -23,7 +24,7 @@ const institutionInclude = {
     include: [{
         model: db.providerProfile,
         as: 'providerProfile',
-        attributes: ['institution_name', 'institution_type_code', 'website', 'about'],
+        attributes: ['institution_name', 'institution_type_code', 'website', 'about', 'logo_file', 'verified_at'],
         required: true,
         include: [{ model: db.institutionType, as: 'institutionType', attributes: nameOnly }]
     }]
@@ -102,6 +103,8 @@ const formatOpening = (row) => {
         institution_name: profile ? profile.institution_name : null,
         institution_type_code: profile ? profile.institution_type_code : null,
         institution_type_name: profile && profile.institutionType ? profile.institutionType.name : null,
+        institution_logo_url: profile && profile.logo_file ? LOGO_URL_PREFIX + profile.logo_file : null,
+        institution_verified: !!(profile && profile.verified_at),
         state_code: row.state_code,
         state_name: row.state ? row.state.name : null,
         city_code: row.city_code,

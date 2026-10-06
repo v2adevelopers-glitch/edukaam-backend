@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const CustomError = require('../lib/custom.error');
-const { errorResponse, successResponse } = require('../lib/response.handler');
+const { errorResponse, successResponse, fileResponse } = require('../lib/response.handler');
 const applicationService = require('../service/application.service');
 const profileService = require('../service/profile.service');
 const { getMeta } = require('../helper/common.helper');
@@ -86,6 +86,28 @@ const updateApplicationStatus = async (req, res) => {
         successResponse(res, message, result.data);
     } catch (err) {
         errorResponse(res, 'updateApplicationStatus', err);
+    }
+};
+
+// Only the provider who owns the job can download the applicant's resume
+const downloadApplicantResume = async (req, res) => {
+    try {
+        const application = await applicationService.getProviderApplication({
+            code: req.params.applicationid,
+            deleted: false,
+            '$job.provider_user_code$': req.user.code
+        });
+        if (!application) {
+            throw new CustomError('application_not_found', 404, "Application not found");
+        }
+
+        const file = await profileService.getSeekerResumeFile(application.applicant.code);
+        if (!file) {
+            throw new CustomError('resume_not_found', 404, "The applicant has not uploaded a resume");
+        }
+        fileResponse(res, 'downloadApplicantResume', file.path, file.name);
+    } catch (err) {
+        errorResponse(res, 'downloadApplicantResume', err);
     }
 };
 
@@ -184,6 +206,7 @@ module.exports = {
     getAllApplications,
     getSingleApplication,
     updateApplicationStatus,
+    downloadApplicantResume,
     // Seeker applications
     getMyApplications,
     getMyApplication,
