@@ -100,9 +100,33 @@ const getMe = async (req, res) => {
     }
 };
 
+// ─── Account administration ───────────────────────────────────────────────
+
+const unlockUser = async (req, res) => {
+    try {
+        const user = await userService.getUserByUsernameOrCode(req.body.username);
+        if (!user) {
+            throw new CustomError('user_not_found', 404, "User not found");
+        }
+
+        const was_locked = user.failed_login_attempts >= MAX_FAILED_LOGINS;
+        await userService.clearFailedLoginAttempts(user.code, getMeta(req));
+
+        successResponse(res, was_locked ? "Account unlocked successfully" : "Account was not locked; failed login count cleared", {
+            user_info: userService.formatUserInfo(user),
+            role_info: userService.formatRoleInfo(user),
+            was_locked
+        });
+    } catch (err) {
+        errorResponse(res, 'unlockUser', err);
+    }
+};
+
 module.exports = {
     // Auth
     loginUser,
     registerUser,
-    getMe
+    getMe,
+    // Account administration
+    unlockUser
 };

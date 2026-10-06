@@ -58,6 +58,18 @@ exports.getUserByCode = async (code, transaction = null) => {
     }
 };
 
+// Admin lookups accept the email, the phone or the user code
+exports.getUserByUsernameOrCode = async (username) => {
+    try {
+        return await db.user.findOne({
+            where: { deleted: false, [Op.or]: [{ email: username.toLowerCase() }, { phone: username }, { code: username.toUpperCase() }] },
+            include: [roleInclude]
+        });
+    } catch (err) {
+        throw err;
+    }
+};
+
 exports.hashPassword = (password) => bcrypt.hash(password, 12);
 
 exports.recordSuccessfulLogin = (user_id) =>
@@ -65,6 +77,21 @@ exports.recordSuccessfulLogin = (user_id) =>
 
 exports.incrementFailedLoginAttempts = (user_id) =>
     db.user.increment('failed_login_attempts', { where: { id: user_id, deleted: false } });
+
+exports.clearFailedLoginAttempts = async (code, meta = {}) => {
+    try {
+        const [updated] = await db.user.update({
+            failed_login_attempts: 0,
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { code, deleted: false } });
+
+        return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};
 
 // ─── Duplicate checks ─────────────────────────────────────────────────────
 

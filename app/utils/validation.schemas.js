@@ -41,6 +41,11 @@ exports.userSchemas = {
         password: Joi.string().required()
     }),
 
+    // admin: clear the failed-login lockout of an account
+    unlockUser: Joi.object({
+        username: Joi.string().trim().max(150).required()      // email, phone or user code
+    }),
+
     // The category/type that doesn't belong to the chosen role is dropped, not rejected,
     // so a form that always posts both fields still works
     register: Joi.object({

@@ -3,6 +3,7 @@ const schedules = require('./schedules');
 const JobRunner = require('./jobRunner');
 
 const closeExpiredJobs = require('./jobs/closeExpiredJobs');
+const purgeRateLimitHits = require('./jobs/purgeRateLimitHits');
 
 class CronScheduler {
     constructor() {
@@ -27,6 +28,7 @@ class CronScheduler {
 
         // just after midnight IST, so jobs whose last date was yesterday close first thing
         this.register('close-expired-jobs', schedules.DAILY_0005AM, closeExpiredJobs, { enabled: true });
+        this.register('purge-rate-limit-hits', schedules.EVERY_HOUR, purgeRateLimitHits, { enabled: true });
 
         this.isInitialized = true;
     }

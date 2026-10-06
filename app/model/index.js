@@ -38,6 +38,9 @@ db.seekerProfile = require('./profile/seeker_profile.model')(sequelize, DataType
 db.job = require('./job/job.model')(sequelize, DataTypes);
 db.application = require('./application/application.model')(sequelize, DataTypes);
 
+db.codeSequence = require('./system/code_sequence.model')(sequelize, DataTypes);
+db.rateLimitHit = require('./system/rate_limit_hit.model')(sequelize, DataTypes);
+
 // ─── Associations ─────────────────────────────────────────────────────────
 // Foreign keys are created here only (never `references:` in a model). Always give `as`,
 // onDelete and onUpdate, and use the same values on both sides of a pair.

@@ -150,3 +150,44 @@
  *                         menu_access: { type: array, items: { $ref: '#/components/schemas/RbacMenuNode' } }
  *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  */
+
+/**
+ * @swagger
+ * /api/v1/users/unlock:
+ *   patch:
+ *     summary: Unlock an account locked by failed logins (admin)
+ *     description: Clears the failed-login counter of the account, so its owner can log in again. `was_locked` tells whether it had reached the 5-attempt lock.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username: { type: string, description: "Email, phone or user code of the account" }
+ *           example: { username: "ritu.saxena@example.com" }
+ *     responses:
+ *       200:
+ *         description: Counter cleared
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         user_info: { $ref: '#/components/schemas/UserInfo' }
+ *                         role_info: { $ref: '#/components/schemas/UserRoleInfo' }
+ *                         was_locked: { type: boolean, example: true }
+ *       400: { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not an admin, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       404: { description: No such account (user_not_found), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */

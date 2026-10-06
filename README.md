@@ -63,6 +63,7 @@ Cron jobs start with the server when `ENABLE_CRON` is `true` in the env config (
 | Job | Schedule | What it does |
 |---|---|---|
 | `close-expired-jobs` | Daily 00:05 IST | Sets `job_status = 'closed'` on open jobs whose `last_date` is before `CURDATE()` |
+| `purge-rate-limit-hits` | Hourly | Deletes rate-limit counters whose window has ended |
 
 Run it once by hand:
 
@@ -102,7 +103,7 @@ edujobs.postman_collection.json
 
 | Area | Base path | Router | Notes |
 |---|---|---|---|
-| user | `/api/v1/users` | `user.router.js` | `POST /login` and `POST /register` are public and rate limited; `GET /me` restores a session (user, profile, role, menu) |
+| user | `/api/v1/users` | `user.router.js` | `POST /login` and `POST /register` are public and rate limited; `GET /me` restores a session (user, profile, role, menu); `PATCH /unlock` (admin) clears a failed-login lockout |
 | rbac | `/api/v1/rbac` | `rbac.router.js` | `GET /menu-access/:rolecode`: menu tree of the caller's own role |
 | master | `/api/v1/master` | `master.router.js` | `job-categories`, `institution-types`, `states`, `cities`: public `GET` list/detail; admin-only `POST`, `PATCH`, `DELETE` |
 | profile | `/api/v1/profile` | `profile.router.js` | `GET`/`PATCH /provider/me` (job provider), `GET`/`PATCH /seeker/me` (job seeker) |
@@ -150,8 +151,8 @@ All input is validated by Joi schemas in `app/utils/validation.schemas.js`. Unkn
 ## Authentication and permissions
 
 - `POST /api/v1/users/login` with `{ username, password }` (`username` is the email or the phone). Send the returned token in the `x-access-token` header. Tokens last 24 hours.
-- Five wrong passwords lock the account (`failed_login_attempts`); unlocking is a DB update for now (see Known issues).
-- `POST /users/login` and `POST /users/register` are rate limited per IP (`RATE_LIMIT` in the env config). Over the limit: `429` with `resData.error = "too_many_requests"`.
+- Five wrong passwords lock the account (`failed_login_attempts`). The admin unlocks it with `PATCH /api/v1/users/unlock` and `{ "username": "<email, phone or user code>" }`.
+- `POST /users/login` and `POST /users/register` are rate limited per IP (`RATE_LIMIT` in the env config). Counters live in the `rate_limit_hits` table, so every app process (pm2 instances, several servers) shares one window. Over the limit: `429` with `resData.error = "too_many_requests"`. If that table can't be reached the request is let through.
 - Roles (`roles.code`, with the key the frontend uses):
 
   | code | role_type | role_key |
@@ -162,7 +163,7 @@ All input is validated by Joi schemas in `app/utils/validation.schemas.js`. Unkn
 
   Every `role_info` in a response carries `role_key`.
 - Role-specific routes use `restrictTo(ROLE_CODES.X)`. Write routes also use `checkApiModuleAccess`, which looks the route pattern up in `api_module_mapping` and checks the role's flags in `role_module_access_mapping` (`POST`→write, `PATCH`/`PUT`→update, `DELETE`→delete, `full_access` grants all). An API with no mapping row is allowed for any logged-in user.
-- Sidebar menus come from `menus` + `role_module_access_mapping.menu_access`. The admin has no menu: it manages master data through Swagger/Postman.
+- Sidebar menus come from `menus` + `role_module_access_mapping.menu_access`. The admin has no menu: it manages master data and unlocks accounts through Swagger/Postman.
 
 ### Business rules (summary)
 
@@ -188,9 +189,10 @@ All input is validated by Joi schemas in `app/utils/validation.schemas.js`. Unkn
 - Soft delete everywhere (`deleted = true, status = 'inactive'`); every read filters `deleted = false`.
 - Unique values (codes, emails, phones, master names) are unique across all rows, deleted ones included, and duplicate checks look at all rows.
 - Other tables are referenced by business code (`jobs.provider_user_code → users.code`, `applications.job_code → jobs.code`, …). Foreign keys are declared only as associations in `model/index.js`.
+- Business codes come from `app/helper/code_generator.helper.js`, always inside the insert's transaction: it locks the prefix's `code_sequences` row, so concurrent inserts for the same prefix wait in turn instead of colliding. It also looks at the table's last code, so rows seeded with fixed codes are never handed out again.
 - `applications` deliberately has no unique index on (`job_code`, `seeker_user_code`): a withdrawn (soft-deleted) application must not block a new one.
 - Money is `DECIMAL(12,2)` (monthly INR) and is returned as a number. Dates without time (`last_date`, `date_of_birth`) are `DATEONLY` strings `YYYY-MM-DD`.
-- Tables: `roles`, `users`, `modules`, `menus`, `role_module_access_mapping`, `api_module_mapping`, `job_categories`, `institution_types`, `states`, `cities`, `provider_profiles`, `seeker_profiles`, `jobs`, `applications`.
+- Tables: `roles`, `users`, `modules`, `menus`, `role_module_access_mapping`, `api_module_mapping`, `job_categories`, `institution_types`, `states`, `cities`, `provider_profiles`, `seeker_profiles`, `jobs`, `applications`, plus two system tables: `code_sequences` (business-code counters) and `rate_limit_hits` (shared rate-limit counters).
 
 ### Migrations
 
@@ -208,6 +210,7 @@ npm run db:migrate:status
 | Seeder | Inserts |
 |---|---|
 | `…000000-insert-default-roles` | Admin, Job Provider, Job Seeker |
+| `…000050-insert-code-sequences` | One `code_sequences` row per business-code prefix |
 | `…000100-insert-default-users` | Admin user (password from `SEED_ADMIN_PASSWORD`) |
 | `…000200-insert-rbac-modules-menus` | Modules, menus, role access and API mappings from `app/data/rbac.json` |
 | `…000300` … `…000600` | Job categories (12), institution types (4), states and union territories (36), cities (199) from `app/data/*.json` |
@@ -250,8 +253,5 @@ A push to `main` runs `.github/workflows/deploy.yml` on a self-hosted runner: `n
 
 ## Known issues
 
-- **Unlocking an account** after 5 failed logins has no API yet: `UPDATE users SET failed_login_attempts = 0 WHERE email = '…';`.
-- **Business-code races:** codes are generated from the last row inside the insert's transaction. Two inserts into the same table at the same instant can compute the same code; the unique index then rejects one (a 500 for that request, no bad data).
-- **Rate limits are per process** (in-memory store). With several pm2 instances, each counts separately.
 - **Master names stay reserved after delete:** names are unique across deleted rows too, so a deleted category/state name can't be reused; mark rows inactive instead of deleting them.
 - **Expired jobs between cron runs:** if `ENABLE_CRON` is off, open jobs past `last_date` stay `open`. They are flagged `is_expired: true` in lists and can't be applied to (`job_expired`).

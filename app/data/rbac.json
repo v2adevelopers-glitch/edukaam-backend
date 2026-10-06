@@ -7,7 +7,8 @@
     { "slug": "applications", "name": "Applications" },
     { "slug": "openings", "name": "Openings" },
     { "slug": "my-applications", "name": "My Applications" },
-    { "slug": "masters", "name": "Master Data" }
+    { "slug": "masters", "name": "Master Data" },
+    { "slug": "users", "name": "Users" }
   ],
   "menus": [
     { "slug": "dashboard", "name": "Dashboard", "icon": "dashboard", "route_to": "/", "module": "dashboard", "ranking": 1, "parent": null },
@@ -22,6 +23,7 @@
   ],
   "role_access": [
     { "role_code": 1001, "module": "masters", "menu_access": false, "read_access": true, "write_access": true, "update_access": true, "delete_access": true, "full_access": true },
+    { "role_code": 1001, "module": "users", "menu_access": false, "read_access": true, "write_access": false, "update_access": true, "delete_access": false, "full_access": false },
 
     { "role_code": 1002, "module": "dashboard", "menu_access": true, "read_access": true },
     { "role_code": 1002, "module": "provider-profile", "menu_access": true, "read_access": true, "update_access": true },
@@ -34,6 +36,8 @@
     { "role_code": 1003, "module": "my-applications", "menu_access": true, "read_access": true, "write_access": true, "delete_access": true }
   ],
   "api_mappings": [
+    { "module": "users", "api_endpoint": "/api/v1/users/unlock", "api_method": "PATCH", "api_slug": "unlock-user" },
+
     { "module": "masters", "api_endpoint": "/api/v1/master/job-categories", "api_method": "POST", "api_slug": "create-job-category" },
     { "module": "masters", "api_endpoint": "/api/v1/master/job-categories/:categorycode", "api_method": "PATCH", "api_slug": "update-job-category" },
     { "module": "masters", "api_endpoint": "/api/v1/master/job-categories/:categorycode", "api_method": "DELETE", "api_slug": "delete-job-category" },
