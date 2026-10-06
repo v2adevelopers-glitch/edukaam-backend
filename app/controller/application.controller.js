@@ -14,7 +14,7 @@ const SERVICE_ERRORS = {
     job_vacancies_filled: [400, "Every vacancy for this job is already filled"],
     job_not_open: [400, "This job is not open for applications"],
     job_expired: [400, "The last date to apply for this job has passed"],
-    category_mismatch: [400, "This job is not in your job category"],
+    category_mismatch: [400, "This job is not in any of your job categories"],
     already_applied: [400, "You have already applied for this job"]
 };
 
@@ -80,6 +80,7 @@ const getSingleApplication = async (req, res) => {
         if (!application) {
             throw new CustomError('application_not_found', 404, "Application not found");
         }
+        application.applicant.additional_job_categories = await profileService.getSeekerAdditionalCategories(application.applicant.code);
         successResponse(res, "Application info fetched", application);
     } catch (err) {
         errorResponse(res, 'getSingleApplication', err);
@@ -252,9 +253,10 @@ const applyToJob = async (req, res) => {
             throw new CustomError('profile_incomplete', 400, `Complete your profile before applying (missing: ${missing.join(', ')})`);
         }
 
+        const categoryCodes = await profileService.getSeekerCategoryCodes(req.user.code);
         const result = await applicationService.applyToJob(
             req.body.job_code,
-            { code: req.user.code, job_category_code: profile.job_category_code },
+            { code: req.user.code, job_category_codes: categoryCodes },
             getMeta(req),
             req.body.cover_note
         );

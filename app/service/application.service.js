@@ -409,7 +409,7 @@ exports.applyToJob = async (job_code, seeker, meta = {}, cover_note = null) => {
 
         if (await jobService.isJobExpired(job.id, t)) return await fail('job_expired');
 
-        if (job.job_category_code !== seeker.job_category_code) return await fail('category_mismatch');
+        if (!seeker.job_category_codes.includes(job.job_category_code)) return await fail('category_mismatch');
 
         const existing = await db.application.findOne({
             where: { job_code, seeker_user_code: seeker.code, deleted: false },

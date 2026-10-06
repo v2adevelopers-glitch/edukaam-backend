@@ -29,6 +29,9 @@ exports.PROVIDER_SETTABLE_STATUSES = [
 
 exports.GENDERS = ['male', 'female', 'other'];
 
+// Besides the primary job_category_code, a seeker may follow this many more categories
+exports.MAX_ADDITIONAL_JOB_CATEGORIES = 2;
+
 exports.INTERVIEW_MODES = ['in_person', 'phone', 'video'];
 
 // Rows in one applicants CSV export

@@ -33,4 +33,15 @@ router.route("/openings")
 router.route("/openings/:jobid")
     .get(protect, seeker, validateParams(jobSchemas.jobid), jobCtrl.getSingleOpening);
 
+// =====================
+// SEEKER SAVED JOBS ROUTES
+// =====================
+
+router.route("/saved-jobs")
+    .get(protect, seeker, validateQuery(jobSchemas.getSavedJobs), jobCtrl.getSavedJobs)
+    .post(protect, seeker, checkApiModuleAccess, validateBody(jobSchemas.saveJob), jobCtrl.saveJob);
+
+router.route("/saved-jobs/:jobid")
+    .delete(protect, seeker, checkApiModuleAccess, validateParams(jobSchemas.jobid), jobCtrl.unsaveJob);
+
 module.exports = router;

@@ -102,6 +102,9 @@ const updateSeekerProfile = async (req, res) => {
 
         await assertAccountFieldsFree(body, userCode);
         await assertMasterCodes({ job_category_code: body.job_category_code });
+        for (const code of body.additional_job_category_codes || []) {
+            await assertMasterCodes({ job_category_code: code });
+        }
         await assertLocation(body, existing);
 
         const result = await profileService.updateSeekerProfile(userCode, body, getMeta(req));

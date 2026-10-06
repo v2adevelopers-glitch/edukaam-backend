@@ -39,6 +39,14 @@
     {
       "slug": "account",
       "name": "Account"
+    },
+    {
+      "slug": "saved-jobs",
+      "name": "Saved Jobs"
+    },
+    {
+      "slug": "talent",
+      "name": "Candidate Search"
     }
   ],
   "menus": [
@@ -121,6 +129,24 @@
       "route_to": "/my-applications/list",
       "module": "my-applications",
       "ranking": 4,
+      "parent": null
+    },
+    {
+      "slug": "saved-jobs",
+      "name": "Saved Jobs",
+      "icon": "bookmark",
+      "route_to": "/saved-jobs/list",
+      "module": "saved-jobs",
+      "ranking": 5,
+      "parent": null
+    },
+    {
+      "slug": "find-candidates",
+      "name": "Find Candidates",
+      "icon": "person_search",
+      "route_to": "/candidates/list",
+      "module": "talent",
+      "ranking": 5,
       "parent": null
     }
   ],
@@ -229,6 +255,20 @@
       "write_access": true,
       "update_access": true,
       "delete_access": true
+    },
+    {
+      "role_code": 1003,
+      "module": "saved-jobs",
+      "menu_access": true,
+      "read_access": true,
+      "write_access": true,
+      "delete_access": true
+    },
+    {
+      "role_code": 1002,
+      "module": "talent",
+      "menu_access": true,
+      "read_access": true
     }
   ],
   "api_mappings": [
@@ -417,6 +457,18 @@
       "api_endpoint": "/api/v1/application/applications/:applicationid/notes",
       "api_method": "PATCH",
       "api_slug": "update-provider-notes"
+    },
+    {
+      "module": "saved-jobs",
+      "api_endpoint": "/api/v1/job/saved-jobs",
+      "api_method": "POST",
+      "api_slug": "save-job"
+    },
+    {
+      "module": "saved-jobs",
+      "api_endpoint": "/api/v1/job/saved-jobs/:jobid",
+      "api_method": "DELETE",
+      "api_slug": "unsave-job"
     }
   ]
 }

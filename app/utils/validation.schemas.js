@@ -1,7 +1,7 @@
 const Joi = require('joi');
 const { REGISTRABLE_ROLE_KEYS } = require('../constants/role.constant');
 const { STORED_FILE_PATTERN } = require('../constants/file.constant');
-const { JOB_TYPES, JOB_STATUS, APPLICATION_STATUSES, PROVIDER_SETTABLE_STATUSES, GENDERS, INTERVIEW_MODES } = require('../constants/job.constant');
+const { JOB_TYPES, JOB_STATUS, APPLICATION_STATUSES, PROVIDER_SETTABLE_STATUSES, GENDERS, INTERVIEW_MODES, MAX_ADDITIONAL_JOB_CATEGORIES } = require('../constants/job.constant');
 
 // Common validation patterns
 const commonPatterns = {
@@ -188,6 +188,11 @@ exports.profileSchemas = {
     updateSeekerProfile: Joi.object({
         ...accountFields,
         job_category_code: businessCode.optional(),
+        // replaces the whole set; [] removes them all
+        additional_job_category_codes: Joi.array().items(businessCode).max(MAX_ADDITIONAL_JOB_CATEGORIES).unique().optional(),
+        // opt-ins for provider candidate search
+        is_discoverable: Joi.boolean().optional(),
+        share_contact: Joi.boolean().optional(),
         gender: Joi.string().valid(...GENDERS).allow(null).optional(),
         date_of_birth: commonPatterns.date.min('1940-01-01').max('now').allow(null).optional(),
         qualification: optionalText(150).optional(),
@@ -248,11 +253,12 @@ exports.jobSchemas = {
         job_status: Joi.string().valid(...Object.values(JOB_STATUS)).optional()
     }).min(1),
 
-    // The seeker's category always comes from their profile, so it is not a filter here
+    // The seeker's categories come from their profile; job_category_code only narrows to one of them
     getOpenings: Joi.object({
         page: commonPatterns.page,
         limit: commonPatterns.limit,
         search: Joi.string().trim().max(100).optional(),
+        job_category_code: businessCode.optional(),
         institution_type_code: businessCode.optional(),
         job_type: Joi.string().valid(...JOB_TYPES).optional(),
         state_code: businessCode.optional(),
@@ -274,6 +280,15 @@ const interviewFields = {
     })),
     interview_notes: whenInterview(optionalText(2000).optional())
 };
+
+exports.jobSchemas.getSavedJobs = Joi.object({
+    page: commonPatterns.page,
+    limit: commonPatterns.limit
+});
+
+exports.jobSchemas.saveJob = Joi.object({
+    job_code: businessCode.required()
+});
 
 // ─── Applications ─────────────────────────────────────────────────────────
 
@@ -324,5 +339,39 @@ exports.applicationSchemas = {
 exports.publicSchemas = {
     filename: Joi.object({
         filename: Joi.string().pattern(STORED_FILE_PATTERN).required()
+    }),
+
+    getPublicJobs: Joi.object({
+        page: commonPatterns.page,
+        limit: commonPatterns.limit,
+        search: Joi.string().trim().max(100).optional(),
+        job_category_code: businessCode.optional(),
+        institution_type_code: businessCode.optional(),
+        job_type: Joi.string().valid(...JOB_TYPES).optional(),
+        state_code: businessCode.optional(),
+        city_code: businessCode.optional()
+    }),
+
+    jobid: Joi.object({
+        jobid: businessCode.required()
+    })
+};
+
+// ─── Talent (candidate search) ────────────────────────────────────────────
+
+exports.talentSchemas = {
+    getCandidates: Joi.object({
+        page: commonPatterns.page,
+        limit: commonPatterns.limit,
+        search: Joi.string().trim().max(100).optional(),
+        job_category_code: businessCode.optional(),
+        state_code: businessCode.optional(),
+        city_code: businessCode.optional(),
+        min_experience_years: Joi.number().integer().min(0).max(60).optional(),
+        max_expected_salary: salary.optional()
+    }),
+
+    usercode: Joi.object({
+        usercode: businessCode.required()
     })
 };

@@ -66,6 +66,8 @@ const formatSeekerProfile = (p) => {
         has_resume: !!p.resume_file,
         resume_name: p.resume_name || null,
         resume_uploaded_at: p.resume_uploaded_at || null,
+        is_discoverable: !!p.is_discoverable,
+        share_contact: !!p.share_contact,
         modified_at: p.modified_at
     };
 };
@@ -83,10 +85,45 @@ exports.getProviderProfileByUserCode = async (user_code) => {
     }
 };
 
+// [{ code, name }] of the seeker's live additional categories
+exports.getSeekerAdditionalCategories = async (user_code, transaction = null) => {
+    try {
+        const rows = await db.seekerAdditionalCategory.findAll({
+            where: { seeker_user_code: user_code, deleted: false },
+            include: [{ model: db.jobCategory, as: 'jobCategory', attributes: nameOnly }],
+            order: [['id', 'ASC']],
+            transaction
+        });
+        return rows.map(r => ({ code: r.job_category_code, name: r.jobCategory ? r.jobCategory.name : null }));
+    } catch (err) {
+        throw err;
+    }
+};
+
 exports.getSeekerProfileByUserCode = async (user_code) => {
     try {
         const profile = await db.seekerProfile.findOne({ where: { user_code, deleted: false }, include: seekerIncludes });
-        return formatSeekerProfile(profile);
+        if (!profile) return null;
+
+        const additional = await exports.getSeekerAdditionalCategories(user_code);
+        return {
+            ...formatSeekerProfile(profile),
+            additional_job_categories: additional,
+            // every category the seeker gets openings from: primary first
+            job_category_codes: profile.job_category_code ? [profile.job_category_code, ...additional.map(c => c.code)] : []
+        };
+    } catch (err) {
+        throw err;
+    }
+};
+
+// Primary + additional categories; empty when the seeker has no primary category yet
+exports.getSeekerCategoryCodes = async (user_code) => {
+    try {
+        const profile = await db.seekerProfile.findOne({ where: { user_code, deleted: false }, attributes: ['job_category_code'] });
+        if (!profile || !profile.job_category_code) return [];
+        const additional = await exports.getSeekerAdditionalCategories(user_code);
+        return [profile.job_category_code, ...additional.map(c => c.code).filter(c => c !== profile.job_category_code)];
     } catch (err) {
         throw err;
     }
@@ -191,25 +228,55 @@ exports.updateProviderProfile = async (user_code, payload, meta = {}) => {
     }
 };
 
+// Makes the live additional categories exactly `codes`: removed ones are soft-deleted, ones
+// added back are revived (the seeker/category pair is unique), new ones inserted
+const syncAdditionalCategories = async (user_code, codes, meta, t) => {
+    const rows = await db.seekerAdditionalCategory.findAll({ where: { seeker_user_code: user_code }, transaction: t });
+    const now = new Date();
+    const audit = { modified_at: now, modified_by: meta.userId || null, ip_address: meta.ip || null };
+
+    for (const row of rows) {
+        const wanted = codes.includes(row.job_category_code);
+        if (wanted && row.deleted) await row.update({ deleted: false, status: 'active', ...audit }, { transaction: t });
+        if (!wanted && !row.deleted) await row.update({ deleted: true, status: 'inactive', ...audit }, { transaction: t });
+    }
+    for (const code of codes.filter(c => !rows.some(r => r.job_category_code === c))) {
+        await db.seekerAdditionalCategory.create({ seeker_user_code: user_code, job_category_code: code, ...auditOnCreate(meta) }, { transaction: t });
+    }
+};
+
 exports.updateSeekerProfile = async (user_code, payload, meta = {}) => {
     try {
         return await updateWithAccount(user_code, {
             fields: { name: payload.name, phone: payload.phone, email: payload.email },
             meta
-        }, (t) => db.seekerProfile.update({
-            job_category_code: payload.job_category_code,
-            gender: payload.gender,
-            // toDateOnly(undefined) is null, which would clear the column on every PATCH
-            date_of_birth: payload.date_of_birth === undefined ? undefined : toDateOnly(payload.date_of_birth),
-            qualification: emptyToNull(payload.qualification),
-            experience_years: payload.experience_years,
-            skills: emptyToNull(payload.skills),
-            expected_salary: payload.expected_salary,
-            state_code: payload.state_code,
-            city_code: payload.city_code,
-            about: emptyToNull(payload.about),
-            ...auditOnUpdate(meta)
-        }, { where: { user_code, deleted: false }, transaction: t }));
+        }, async (t) => {
+            // additional categories never repeat the primary one
+            if (payload.additional_job_category_codes !== undefined || payload.job_category_code !== undefined) {
+                const profile = await db.seekerProfile.findOne({ where: { user_code, deleted: false }, attributes: ['job_category_code'], transaction: t });
+                const primary = payload.job_category_code || profile.job_category_code;
+                const current = (await exports.getSeekerAdditionalCategories(user_code, t)).map(c => c.code);
+                const wanted = (payload.additional_job_category_codes !== undefined ? payload.additional_job_category_codes : current)
+                    .filter(code => code !== primary);
+                await syncAdditionalCategories(user_code, wanted, meta, t);
+            }
+            return db.seekerProfile.update({
+                job_category_code: payload.job_category_code,
+                gender: payload.gender,
+                // toDateOnly(undefined) is null, which would clear the column on every PATCH
+                date_of_birth: payload.date_of_birth === undefined ? undefined : toDateOnly(payload.date_of_birth),
+                qualification: emptyToNull(payload.qualification),
+                experience_years: payload.experience_years,
+                skills: emptyToNull(payload.skills),
+                expected_salary: payload.expected_salary,
+                state_code: payload.state_code,
+                city_code: payload.city_code,
+                about: emptyToNull(payload.about),
+                is_discoverable: payload.is_discoverable,
+                share_contact: payload.share_contact,
+                ...auditOnUpdate(meta)
+            }, { where: { user_code, deleted: false }, transaction: t });
+        });
     } catch (err) {
         throw err;
     }

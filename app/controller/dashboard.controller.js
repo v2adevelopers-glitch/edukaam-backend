@@ -2,7 +2,7 @@ const { Op, fn } = require('sequelize');
 const { errorResponse, successResponse } = require('../lib/response.handler');
 const dashboardService = require('../service/dashboard.service');
 const profileService = require('../service/profile.service');
-const { JOB_STATUS } = require('../constants/job.constant');
+const { visibleOpeningWhere } = require('../helper/job_filter.helper');
 
 // ─── Dashboards ───────────────────────────────────────────────────────────
 
@@ -17,14 +17,12 @@ const getProviderDashboard = async (req, res) => {
 
 const getSeekerDashboard = async (req, res) => {
     try {
-        const profile = await profileService.getSeekerProfileByUserCode(req.user.code);
+        const categoryCodes = await profileService.getSeekerCategoryCodes(req.user.code);
 
-        // newest open, unexpired jobs in the seeker's own category (same rows as the openings list)
-        const openingsWhere = profile && profile.job_category_code ? {
-            deleted: false,
-            status: 'active',
-            job_status: JOB_STATUS.OPEN,
-            job_category_code: profile.job_category_code,
+        // newest open, unexpired jobs in the seeker's categories (same rows as the openings list)
+        const openingsWhere = categoryCodes.length ? {
+            ...visibleOpeningWhere(),
+            job_category_code: { [Op.in]: categoryCodes },
             last_date: { [Op.gte]: fn('CURDATE') }
         } : null;
 

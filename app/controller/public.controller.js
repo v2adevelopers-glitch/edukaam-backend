@@ -1,6 +1,43 @@
+const { Op, fn } = require('sequelize');
 const CustomError = require('../lib/custom.error');
-const { errorResponse } = require('../lib/response.handler');
+const { errorResponse, successResponse } = require('../lib/response.handler');
 const profileService = require('../service/profile.service');
+const jobService = require('../service/job.service');
+const { visibleOpeningWhere, applyOpeningFilters } = require('../helper/job_filter.helper');
+
+// Public jobs: open and not past their last date (no contact details, no seeker flags)
+const publicJobWhere = () => ({ ...visibleOpeningWhere(), last_date: { [Op.gte]: fn('CURDATE') } });
+
+// ─── Public jobs ──────────────────────────────────────────────────────────
+
+const getPublicJobs = async (req, res) => {
+    try {
+        const { page, limit, job_category_code } = req.query;
+
+        let whereCondition = publicJobWhere();
+        if (job_category_code) {
+            whereCondition.job_category_code = job_category_code;
+        }
+        applyOpeningFilters(whereCondition, req.query);
+
+        const jobs = await jobService.getPublicJobs(whereCondition, page, limit);
+        successResponse(res, "Jobs fetched successfully", jobs);
+    } catch (err) {
+        errorResponse(res, 'getPublicJobs', err);
+    }
+};
+
+const getPublicJob = async (req, res) => {
+    try {
+        const job = await jobService.getPublicJob({ ...publicJobWhere(), code: req.params.jobid });
+        if (!job) {
+            throw new CustomError('job_not_found', 404, "Job not found");
+        }
+        successResponse(res, "Job info fetched", job);
+    } catch (err) {
+        errorResponse(res, 'getPublicJob', err);
+    }
+};
 
 // ─── Logos ────────────────────────────────────────────────────────────────
 
@@ -23,6 +60,9 @@ const getLogo = async (req, res) => {
 };
 
 module.exports = {
+    // Public jobs
+    getPublicJobs,
+    getPublicJob,
     // Logos
     getLogo
 };

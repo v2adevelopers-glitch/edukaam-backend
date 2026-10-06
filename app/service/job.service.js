@@ -49,6 +49,18 @@ const alreadyAppliedAttr = (seekerUserCode) => [
     'already_applied'
 ];
 
+const isSavedAttr = (seekerUserCode) => [
+    literal('EXISTS(SELECT 1 FROM saved_jobs AS s WHERE s.job_code = `job`.`code` AND s.deleted = false'
+        + ` AND s.seeker_user_code = ${db.sequelize.escape(seekerUserCode)})`),
+    'is_saved'
+];
+
+const savedAtAttr = (seekerUserCode) => [
+    literal('(SELECT s.modified_at FROM saved_jobs AS s WHERE s.job_code = `job`.`code` AND s.deleted = false'
+        + ` AND s.seeker_user_code = ${db.sequelize.escape(seekerUserCode)})`),
+    'saved_at'
+];
+
 const toBool = (value) => !!Number(value);
 
 const paginate = (count, rows, page, limit) => ({
@@ -117,9 +129,14 @@ const formatOpening = (row) => {
         last_date: row.last_date,
         description: row.description,
         job_status: row.job_status,
-        already_applied: toBool(row.get('already_applied')),
         is_expired: toBool(row.get('is_expired')),
-        posted_at: row.created_at
+        posted_at: row.created_at,
+        // seeker-specific flags; absent on the public list
+        ...(row.get('already_applied') !== undefined ? {
+            already_applied: toBool(row.get('already_applied')),
+            is_saved: toBool(row.get('is_saved'))
+        } : {}),
+        ...(row.get('saved_at') !== undefined ? { saved_at: row.get('saved_at') } : {})
     };
 };
 
@@ -354,23 +371,41 @@ exports.updateJobHiring = async (jobId, { hired_count, job_status }, meta = {}, 
 
 // ─── Seeker openings ──────────────────────────────────────────────────────
 
-const openingOptions = (seekerUserCode) => ({
-    attributes: [...JOB_COLUMNS, alreadyAppliedAttr(seekerUserCode), isExpiredAttr],
+// seekerUserCode null = public listing (no seeker flags)
+const openingOptions = (seekerUserCode, extraAttributes = []) => ({
+    attributes: [
+        ...JOB_COLUMNS,
+        isExpiredAttr,
+        ...(seekerUserCode ? [alreadyAppliedAttr(seekerUserCode), isSavedAttr(seekerUserCode)] : []),
+        ...extraAttributes
+    ],
     include: [...jobMasterIncludes, institutionInclude]
+});
+
+const listOpenings = async (options, whereCondition, page, limit, order) => {
+    const offset = (page - 1) * limit;
+    const { count, rows } = await db.job.findAndCountAll({
+        ...options,
+        where: whereCondition,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        order,
+        distinct: true
+    });
+    return paginate(count, rows.map(formatOpening), page, limit);
+};
+
+const NEWEST_FIRST = [['created_at', 'DESC'], ['id', 'DESC']];
+
+const withInstitutionDetails = (row) => ({
+    ...formatOpening(row),
+    institution_website: row.provider.providerProfile.website,
+    institution_about: row.provider.providerProfile.about
 });
 
 exports.getOpenings = async (whereCondition, seekerUserCode, page = 1, limit = 10) => {
     try {
-        const offset = (page - 1) * limit;
-        const { count, rows } = await db.job.findAndCountAll({
-            ...openingOptions(seekerUserCode),
-            where: whereCondition,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            order: [['created_at', 'DESC'], ['id', 'DESC']],
-            distinct: true
-        });
-        return paginate(count, rows.map(formatOpening), page, limit);
+        return await listOpenings(openingOptions(seekerUserCode), whereCondition, page, limit, NEWEST_FIRST);
     } catch (err) {
         throw err;
     }
@@ -385,18 +420,100 @@ exports.getOpening = async (whereCondition, seekerUserCode) => {
             where: { job_code: row.code, seeker_user_code: seekerUserCode, deleted: false },
             attributes: ['code', 'application_status', 'applied_at']
         });
-        const profile = row.provider.providerProfile;
 
         return {
-            ...formatOpening(row),
-            institution_website: profile.website,
-            institution_about: profile.about,
+            ...withInstitutionDetails(row),
             my_application: myApplication ? {
                 code: myApplication.code,
                 application_status: myApplication.application_status,
                 applied_at: myApplication.applied_at
             } : null
         };
+    } catch (err) {
+        throw err;
+    }
+};
+
+// ─── Public jobs ──────────────────────────────────────────────────────────
+
+exports.getPublicJobs = async (whereCondition, page = 1, limit = 10) => {
+    try {
+        return await listOpenings(openingOptions(null), whereCondition, page, limit, NEWEST_FIRST);
+    } catch (err) {
+        throw err;
+    }
+};
+
+exports.getPublicJob = async (whereCondition) => {
+    try {
+        const row = await db.job.findOne({ ...openingOptions(null), where: whereCondition });
+        return row ? withInstitutionDetails(row) : null;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// ─── Saved jobs ───────────────────────────────────────────────────────────
+
+// The seeker's saved jobs (open or not), most recently saved first
+exports.getSavedJobs = async (whereCondition, seekerUserCode, page = 1, limit = 10) => {
+    try {
+        const savedBySeeker = literal(`(SELECT s.job_code FROM saved_jobs AS s WHERE s.deleted = false
+            AND s.seeker_user_code = ${db.sequelize.escape(seekerUserCode)})`);
+        return await listOpenings(
+            openingOptions(seekerUserCode, [savedAtAttr(seekerUserCode)]),
+            { ...whereCondition, code: { [Op.in]: savedBySeeker } },
+            page, limit,
+            [[literal('saved_at'), 'DESC'], ['id', 'DESC']]
+        );
+    } catch (err) {
+        throw err;
+    }
+};
+
+// Saving twice is fine; saving after unsaving revives the same row (the pair is unique)
+exports.saveJob = async (seeker_user_code, job_code, meta = {}) => {
+    try {
+        const existing = await db.savedJob.findOne({ where: { seeker_user_code, job_code } });
+        const now = new Date();
+        if (existing && !existing.deleted) return { created: false };
+        if (existing) {
+            await existing.update({ deleted: false, status: 'active', modified_at: now, modified_by: meta.userId || null, ip_address: meta.ip || null });
+            return { created: true };
+        }
+        try {
+            await db.savedJob.create({
+                seeker_user_code,
+                job_code,
+                status: 'active',
+                deleted: false,
+                created_at: now,
+                created_by: meta.userId || null,
+                modified_at: now,
+                modified_by: null,
+                ip_address: meta.ip || null
+            });
+        } catch (err) {
+            // a concurrent save of the same job won the insert
+            if (err.name === 'SequelizeUniqueConstraintError') return { created: false };
+            throw err;
+        }
+        return { created: true };
+    } catch (err) {
+        throw err;
+    }
+};
+
+exports.unsaveJob = async (seeker_user_code, job_code, meta = {}) => {
+    try {
+        const [updated] = await db.savedJob.update({
+            deleted: true,
+            status: 'inactive',
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { seeker_user_code, job_code, deleted: false } });
+        return !!updated;
     } catch (err) {
         throw err;
     }

@@ -6,7 +6,7 @@ const profileService = require('../service/profile.service');
 const { assertMasterCodes, assertCityInState } = require('../helper/master.helper');
 const { getMeta } = require('../helper/common.helper');
 const { toDateOnly } = require('../helper/query.helper');
-const { JOB_STATUS } = require('../constants/job.constant');
+const { visibleOpeningWhere, applyOpeningFilters } = require('../helper/job_filter.helper');
 
 // Rules the job service checks under its row lock, reported as { error: name }
 const SERVICE_ERRORS = {
@@ -36,13 +36,17 @@ const assertLastDateNotPast = async (lastDate) => {
     }
 };
 
-// The seeker's category always comes from their profile, never from the client
-const getSeekerCategoryOrThrow = async (userCode) => {
-    const profile = await profileService.getSeekerProfileByUserCode(userCode);
-    if (!profile || !profile.job_category_code) {
+// The seeker's categories always come from their profile (primary + additional); the client
+// can narrow to one of them but never widen
+const getSeekerCategoriesOrThrow = async (userCode, narrowTo) => {
+    const codes = await profileService.getSeekerCategoryCodes(userCode);
+    if (!codes.length) {
         throw new CustomError('profile_incomplete', 400, "Choose your job category in your profile to see openings");
     }
-    return profile.job_category_code;
+    if (narrowTo && !codes.includes(narrowTo)) {
+        throw new CustomError('category_not_in_profile', 400, "That job category is not one of your profile's categories");
+    }
+    return narrowTo ? [narrowTo] : codes;
 };
 
 // ─── Provider jobs ────────────────────────────────────────────────────────
@@ -150,34 +154,11 @@ const deleteJob = async (req, res) => {
 
 const getAllOpenings = async (req, res) => {
     try {
-        const { page, limit, search, institution_type_code, job_type, state_code, city_code } = req.query;
-        const categoryCode = await getSeekerCategoryOrThrow(req.user.code);
+        const { page, limit, job_category_code } = req.query;
+        const categoryCodes = await getSeekerCategoriesOrThrow(req.user.code, job_category_code);
 
-        let whereCondition = {
-            deleted: false,
-            status: 'active',
-            job_status: JOB_STATUS.OPEN,
-            job_category_code: categoryCode
-        };
-
-        if (institution_type_code) {
-            whereCondition['$provider.providerProfile.institution_type_code$'] = institution_type_code;
-        }
-        if (job_type) {
-            whereCondition.job_type = job_type;
-        }
-        if (state_code) {
-            whereCondition.state_code = state_code;
-        }
-        if (city_code) {
-            whereCondition.city_code = city_code;
-        }
-        if (search) {
-            whereCondition[Op.or] = [
-                { title: { [Op.like]: `%${search}%` } },
-                { '$provider.providerProfile.institution_name$': { [Op.like]: `%${search}%` } }
-            ];
-        }
+        let whereCondition = { ...visibleOpeningWhere(), job_category_code: { [Op.in]: categoryCodes } };
+        applyOpeningFilters(whereCondition, req.query);
 
         const openings = await jobService.getOpenings(whereCondition, req.user.code, page, limit);
         successResponse(res, "Openings fetched successfully", openings);
@@ -188,15 +169,13 @@ const getAllOpenings = async (req, res) => {
 
 const getSingleOpening = async (req, res) => {
     try {
-        const categoryCode = await getSeekerCategoryOrThrow(req.user.code);
+        const categoryCodes = await getSeekerCategoriesOrThrow(req.user.code);
 
         // a job in another category is reported as not found: seekers never see other categories
         const opening = await jobService.getOpening({
+            ...visibleOpeningWhere(),
             code: req.params.jobid,
-            deleted: false,
-            status: 'active',
-            job_status: JOB_STATUS.OPEN,
-            job_category_code: categoryCode
+            job_category_code: { [Op.in]: categoryCodes }
         }, req.user.code);
         if (!opening) {
             throw new CustomError('job_not_found', 404, "Job not found");
@@ -205,6 +184,56 @@ const getSingleOpening = async (req, res) => {
         successResponse(res, "Opening info fetched", opening);
     } catch (err) {
         errorResponse(res, 'getSingleOpening', err);
+    }
+};
+
+// ─── Saved jobs ───────────────────────────────────────────────────────────
+
+const getSavedJobs = async (req, res) => {
+    try {
+        const { page, limit } = req.query;
+
+        // closed jobs stay in the list (with their job_status); taken-down and deleted ones don't
+        let whereCondition = { deleted: false, status: 'active', taken_down_at: null };
+
+        const saved = await jobService.getSavedJobs(whereCondition, req.user.code, page, limit);
+        successResponse(res, "Saved jobs fetched successfully", saved);
+    } catch (err) {
+        errorResponse(res, 'getSavedJobs', err);
+    }
+};
+
+const saveJob = async (req, res) => {
+    try {
+        const { job_code } = req.body;
+        const categoryCodes = await getSeekerCategoriesOrThrow(req.user.code);
+
+        // only an opening the seeker can see can be saved
+        const opening = await jobService.getOpening({
+            ...visibleOpeningWhere(),
+            code: job_code,
+            job_category_code: { [Op.in]: categoryCodes }
+        }, req.user.code);
+        if (!opening) {
+            throw new CustomError('job_not_found', 404, "Job not found");
+        }
+
+        const result = await jobService.saveJob(req.user.code, job_code, getMeta(req));
+        successResponse(res, result.created ? "Job saved" : "Job was already saved", { job_code, is_saved: true });
+    } catch (err) {
+        errorResponse(res, 'saveJob', err);
+    }
+};
+
+const unsaveJob = async (req, res) => {
+    try {
+        const removed = await jobService.unsaveJob(req.user.code, req.params.jobid, getMeta(req));
+        if (!removed) {
+            throw new CustomError('saved_job_not_found', 404, "This job is not in your saved jobs");
+        }
+        successResponse(res, "Job removed from saved jobs", { job_code: req.params.jobid, is_saved: false });
+    } catch (err) {
+        errorResponse(res, 'unsaveJob', err);
     }
 };
 
@@ -217,5 +246,9 @@ module.exports = {
     deleteJob,
     // Seeker openings
     getAllOpenings,
-    getSingleOpening
+    getSingleOpening,
+    // Saved jobs
+    getSavedJobs,
+    saveJob,
+    unsaveJob
 };
