@@ -219,3 +219,46 @@ exports.markVerified = async (code, channel, meta = {}, transaction = null) => {
         throw err;
     }
 };
+
+// Deactivating also ends the user's sessions
+exports.setStatus = async (code, status, meta = {}) => {
+    try {
+        const [updated] = await db.user.update({
+            status,
+            token_version: status === 'inactive' ? db.sequelize.literal('token_version + 1') : undefined,
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { code, deleted: false } });
+
+        return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// Account deletion: personal data is replaced with placeholders, so the email and phone are
+// free to register again, and rows that point at the user (a hire, a job) stay consistent
+exports.anonymizeUser = async (code, meta = {}, transaction = null) => {
+    try {
+        const [updated] = await db.user.update({
+            name: 'Deleted user',
+            email: `deleted.${code.toLowerCase()}@deleted.invalid`,
+            phone: `DEL${code}`.slice(0, 15),
+            password: null,
+            email_verified_at: null,
+            phone_verified_at: null,
+            failed_login_attempts: 0,
+            token_version: db.sequelize.literal('token_version + 1'),
+            status: 'inactive',
+            deleted: true,
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { code, deleted: false }, transaction });
+
+        return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};

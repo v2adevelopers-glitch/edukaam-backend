@@ -15,7 +15,8 @@ const SERVICE_ERRORS = {
     job_category_locked: [400, "The job category can't change while the job has applications"],
     vacancies_below_hired: [400, "Vacancies can't be lower than the number of people already hired"],
     job_vacancies_filled: [400, "Every vacancy is filled; add vacancies before reopening the job"],
-    job_expired: [400, "The last date has passed; set a new last_date to reopen the job"]
+    job_expired: [400, "The last date has passed; set a new last_date to reopen the job"],
+    job_taken_down: [400, "This job was taken down by the admin and can't be reopened"]
 };
 
 const throwServiceError = (name) => {

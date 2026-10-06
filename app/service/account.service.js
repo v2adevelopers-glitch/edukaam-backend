@@ -1,6 +1,10 @@
 const db = require('../model');
 const userService = require('./user.service');
 const otpService = require('./otp.service');
+const profileService = require('./profile.service');
+const jobService = require('./job.service');
+const applicationService = require('./application.service');
+const { ROLE_CODES } = require('../constants/role.constant');
 const { sendEmail, sendSms } = require('../helper/messaging.helper');
 const { OTP_PURPOSE, OTP_CHANNEL, OTP_TTL_MINUTES } = require('../constants/account.constant');
 
@@ -132,6 +136,70 @@ exports.confirmVerification = async (user, channel, otp, meta = {}) => {
 exports.logout = async (code, meta = {}) => {
     try {
         return { data: await userService.revokeSessions(code, meta) };
+    } catch (err) {
+        throw err;
+    }
+};
+
+// ─── Delete / export my account ───────────────────────────────────────────
+
+// All in one transaction: a seeker's open applications are withdrawn (hires stay) and saved
+// jobs dropped; a provider's open jobs are closed; the profile's personal data is cleared and
+// the user anonymised. Stored files are removed after the commit.
+exports.deleteAccount = async (user, meta = {}) => {
+    const t = await db.sequelize.transaction();
+    let file = null;
+    try {
+        if (user.role_code === ROLE_CODES.JOB_SEEKER) {
+            await applicationService.withdrawAllForSeeker(user.code, meta, t);
+            await jobService.unsaveAllForSeeker(user.code, meta, t);
+            file = { kind: 'RESUME', name: await profileService.eraseSeekerProfile(user.code, meta, t) };
+        } else if (user.role_code === ROLE_CODES.JOB_PROVIDER) {
+            await jobService.closeAllForProvider(user.code, meta, t);
+            file = { kind: 'LOGO', name: await profileService.eraseProviderProfile(user.code, meta, t) };
+        }
+        await otpService.retireAll(user.code, t);
+        await userService.anonymizeUser(user.code, meta, t);
+        await t.commit();
+    } catch (err) {
+        await t.rollback();
+        throw err;
+    }
+
+    if (file && file.name) {
+        try {
+            await profileService.removeStoredFile(file.kind, file.name);
+        } catch (err) {
+            console.error('[ACCOUNT] stored file of a deleted account could not be removed', user.code, err.message);
+        }
+    }
+    return { data: true };
+};
+
+const EXPORT_LIMIT = 10000;
+
+// Everything the platform holds about the user, as one JSON document
+exports.exportAccount = async (user) => {
+    try {
+        const data = {
+            exported_at: new Date(),
+            account: userService.formatUserInfo(user),
+            role_info: userService.formatRoleInfo(user),
+            profile: await profileService.getProfileForRole(user.role_code, user.code)
+        };
+
+        if (user.role_code === ROLE_CODES.JOB_SEEKER) {
+            const [applications, saved] = await Promise.all([
+                applicationService.getSeekerApplications({ deleted: false, seeker_user_code: user.code }, 1, EXPORT_LIMIT),
+                jobService.getSavedJobs({ deleted: false }, user.code, 1, EXPORT_LIMIT)
+            ]);
+            data.applications = applications.data;
+            data.saved_jobs = saved.data.map(j => ({ code: j.code, title: j.title, institution_name: j.institution_name, saved_at: j.saved_at }));
+        } else if (user.role_code === ROLE_CODES.JOB_PROVIDER) {
+            const jobs = await jobService.getProviderJobs({ deleted: false, provider_user_code: user.code }, 1, EXPORT_LIMIT);
+            data.jobs = jobs.data;
+        }
+        return { data };
     } catch (err) {
         throw err;
     }

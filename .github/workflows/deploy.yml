@@ -15,6 +15,8 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: echo "${{ secrets.DEV_ENV }}" > .env
+      # schema changes to existing tables (no-ops on a first deploy: sync creates the tables)
+      - run: npx sequelize-cli db:migrate
       - run: npm install -g pm2
       - name: Start or restart pm2 process
         run: |

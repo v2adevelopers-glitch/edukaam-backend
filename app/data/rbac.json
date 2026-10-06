@@ -47,6 +47,10 @@
     {
       "slug": "talent",
       "name": "Candidate Search"
+    },
+    {
+      "slug": "admin",
+      "name": "Administration"
     }
   ],
   "menus": [
@@ -269,6 +273,16 @@
       "module": "talent",
       "menu_access": true,
       "read_access": true
+    },
+    {
+      "role_code": 1001,
+      "module": "admin",
+      "menu_access": false,
+      "read_access": true,
+      "write_access": true,
+      "update_access": true,
+      "delete_access": true,
+      "full_access": true
     }
   ],
   "api_mappings": [
@@ -469,6 +483,30 @@
       "api_endpoint": "/api/v1/job/saved-jobs/:jobid",
       "api_method": "DELETE",
       "api_slug": "unsave-job"
+    },
+    {
+      "module": "account",
+      "api_endpoint": "/api/v1/users/me",
+      "api_method": "DELETE",
+      "api_slug": "delete-my-account"
+    },
+    {
+      "module": "admin",
+      "api_endpoint": "/api/v1/admin/users/:usercode/status",
+      "api_method": "PATCH",
+      "api_slug": "update-user-status"
+    },
+    {
+      "module": "admin",
+      "api_endpoint": "/api/v1/admin/providers/:usercode/verification",
+      "api_method": "PATCH",
+      "api_slug": "update-provider-verification"
+    },
+    {
+      "module": "admin",
+      "api_endpoint": "/api/v1/admin/jobs/:jobid/moderation",
+      "api_method": "PATCH",
+      "api_slug": "moderate-job"
     }
   ]
 }

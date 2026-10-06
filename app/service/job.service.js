@@ -33,7 +33,7 @@ const institutionInclude = {
 const JOB_COLUMNS = [
     'code', 'provider_user_code', 'job_category_code', 'title', 'job_type', 'vacancies', 'hired_count',
     'min_qualification', 'min_experience_years', 'salary_min', 'salary_max', 'state_code', 'city_code',
-    'last_date', 'description', 'job_status', 'created_at', 'modified_at'
+    'last_date', 'description', 'job_status', 'taken_down_at', 'takedown_reason', 'created_at', 'modified_at'
 ];
 
 // `job` is the alias Sequelize gives the jobs table in these queries
@@ -98,6 +98,9 @@ const formatProviderJob = (row) => {
         description: row.description,
         job_status: row.job_status,
         is_expired: toBool(row.get('is_expired')),
+        // set by the admin; a taken-down job is closed and can't be reopened
+        taken_down: !!row.taken_down_at,
+        takedown_reason: row.takedown_reason,
         created_at: row.created_at,
         modified_at: row.modified_at
     };
@@ -257,6 +260,10 @@ exports.updateJob = async (code, provider_user_code, payload, meta = {}) => {
 
         let job_status = payload.job_status !== undefined ? payload.job_status : job.job_status;
         if (payload.job_status === JOB_STATUS.OPEN && job.job_status !== JOB_STATUS.OPEN) {
+            if (job.taken_down_at) {
+                await t.rollback();
+                return { error: 'job_taken_down' };
+            }
             if (filled) {
                 await t.rollback();
                 return { error: 'job_vacancies_filled' };
@@ -514,6 +521,119 @@ exports.unsaveJob = async (seeker_user_code, job_code, meta = {}) => {
             ip_address: meta.ip || null
         }, { where: { seeker_user_code, job_code, deleted: false } });
         return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// ─── Admin moderation ─────────────────────────────────────────────────────
+
+const adminJobOptions = {
+    attributes: [...JOB_COLUMNS, applicantsCountAttr, isExpiredAttr],
+    include: [
+        ...jobMasterIncludes,
+        {
+            model: db.user,
+            as: 'provider',
+            attributes: ['code', 'deleted'],
+            include: [{ model: db.providerProfile, as: 'providerProfile', attributes: ['institution_name'] }]
+        }
+    ]
+};
+
+const formatAdminJob = (row) => ({
+    ...formatProviderJob(row),
+    provider_user_code: row.provider_user_code,
+    institution_name: row.provider && row.provider.providerProfile ? row.provider.providerProfile.institution_name : null,
+    taken_down_at: row.taken_down_at
+});
+
+exports.getAdminJobs = async (whereCondition = { deleted: false }, page = 1, limit = 10) => {
+    try {
+        const offset = (page - 1) * limit;
+        const { count, rows } = await db.job.findAndCountAll({
+            ...adminJobOptions,
+            where: whereCondition,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            order: [['created_at', 'DESC'], ['id', 'DESC']],
+            distinct: true
+        });
+        return paginate(count, rows.map(formatAdminJob), page, limit);
+    } catch (err) {
+        throw err;
+    }
+};
+
+exports.getAdminJob = async (code) => {
+    try {
+        const row = await db.job.findOne({ ...adminJobOptions, where: { code, deleted: false } });
+        return row ? formatAdminJob(row) : null;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// Takedown closes the job and blocks reopening; restore lifts the block (the job stays closed
+// until its provider reopens it). Returns { error } or { data }.
+exports.moderateJob = async (code, action, reason, meta = {}) => {
+    const t = await db.sequelize.transaction();
+    try {
+        const job = await db.job.findOne({ where: { code, deleted: false }, lock: t.LOCK.UPDATE, transaction: t });
+        if (!job) {
+            await t.rollback();
+            return { error: 'job_not_found' };
+        }
+        const audit = { modified_at: new Date(), modified_by: meta.userId || null, ip_address: meta.ip || null };
+
+        if (action === 'takedown') {
+            if (job.taken_down_at) {
+                await t.rollback();
+                return { error: 'job_already_taken_down' };
+            }
+            await job.update({ taken_down_at: new Date(), taken_down_by: meta.userId || null, takedown_reason: reason, job_status: JOB_STATUS.CLOSED, ...audit }, { transaction: t });
+        } else {
+            if (!job.taken_down_at) {
+                await t.rollback();
+                return { error: 'job_not_taken_down' };
+            }
+            await job.update({ taken_down_at: null, taken_down_by: null, takedown_reason: null, ...audit }, { transaction: t });
+        }
+
+        await t.commit();
+        return { data: await exports.getAdminJob(code) };
+    } catch (err) {
+        await t.rollback();
+        throw err;
+    }
+};
+
+// ─── Account deletion ─────────────────────────────────────────────────────
+
+// A deleted provider's open jobs stop taking applications (rows stay for applicants' history)
+exports.closeAllForProvider = async (provider_user_code, meta = {}, transaction = null) => {
+    try {
+        const [closed] = await db.job.update({
+            job_status: JOB_STATUS.CLOSED,
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { provider_user_code, deleted: false, job_status: JOB_STATUS.OPEN }, transaction });
+        return closed;
+    } catch (err) {
+        throw err;
+    }
+};
+
+exports.unsaveAllForSeeker = async (seeker_user_code, meta = {}, transaction = null) => {
+    try {
+        await db.savedJob.update({
+            deleted: true,
+            status: 'inactive',
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { seeker_user_code, deleted: false }, transaction });
     } catch (err) {
         throw err;
     }

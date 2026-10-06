@@ -382,3 +382,73 @@ exports.getLogoFile = async (fileName) => {
         throw err;
     }
 };
+
+// ─── Admin verification & account deletion ────────────────────────────────
+
+exports.setProviderVerified = async (user_code, verified, meta = {}) => {
+    try {
+        const [updated] = await db.providerProfile.update({
+            verified_at: verified ? new Date() : null,
+            verified_by: verified ? meta.userId || null : null,
+            ...auditOnUpdate(meta)
+        }, { where: { user_code, deleted: false } });
+        return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};
+
+const erased = (meta) => ({ status: 'inactive', deleted: true, ...auditOnUpdate(meta) });
+
+// Clears the seeker's personal data; returns the resume file name to delete after commit
+exports.eraseSeekerProfile = async (user_code, meta = {}, transaction = null) => {
+    try {
+        const profile = await db.seekerProfile.findOne({ where: { user_code, deleted: false }, attributes: ['id', 'resume_file'], transaction });
+        if (!profile) return null;
+
+        await db.seekerProfile.update({
+            gender: null,
+            date_of_birth: null,
+            qualification: null,
+            experience_years: null,
+            skills: null,
+            expected_salary: null,
+            state_code: null,
+            city_code: null,
+            about: null,
+            resume_file: null,
+            resume_name: null,
+            resume_uploaded_at: null,
+            is_discoverable: false,
+            share_contact: false,
+            ...erased(meta)
+        }, { where: { id: profile.id }, transaction });
+        await db.seekerAdditionalCategory.update(erased(meta), { where: { seeker_user_code: user_code, deleted: false }, transaction });
+        return profile.resume_file;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// The institution's name and type stay (seekers' application history shows them); the
+// contact person's details and the logo go. Returns the logo file name to delete after commit.
+exports.eraseProviderProfile = async (user_code, meta = {}, transaction = null) => {
+    try {
+        const profile = await db.providerProfile.findOne({ where: { user_code, deleted: false }, attributes: ['id', 'logo_file'], transaction });
+        if (!profile) return null;
+
+        await db.providerProfile.update({
+            contact_person: null,
+            designation: null,
+            address: null,
+            pincode: null,
+            logo_file: null,
+            ...erased(meta)
+        }, { where: { id: profile.id }, transaction });
+        return profile.logo_file;
+    } catch (err) {
+        throw err;
+    }
+};
+
+exports.removeStoredFile = (kind, fileName) => fileStorage.removeFile(UPLOADS[kind].dir, fileName);

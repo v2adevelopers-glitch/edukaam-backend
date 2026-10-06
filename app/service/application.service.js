@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const db = require('../model');
 const jobService = require('./job.service');
 const codeGenerator = require('../helper/code_generator.helper');
@@ -42,7 +43,7 @@ const providerIncludes = (withFullProfile) => [
     {
         model: db.user,
         as: 'seeker',
-        attributes: ['code', 'name', 'phone', 'email'],
+        attributes: ['code', 'name', 'phone', 'email', 'deleted'],
         required: true,
         include: [{
             model: db.seekerProfile,
@@ -70,8 +71,9 @@ const formatProviderApplication = (row) => {
         job_category_name: row.job.jobCategory ? row.job.jobCategory.name : null,
         applicant_code: row.seeker.code,
         applicant_name: row.seeker.name,
-        applicant_phone: row.seeker.phone,
-        applicant_email: row.seeker.email,
+        // a deleted account's placeholders are not contact details
+        applicant_phone: row.seeker.deleted ? null : row.seeker.phone,
+        applicant_email: row.seeker.deleted ? null : row.seeker.email,
         experience_years: profile ? profile.experience_years : null,
         qualification: profile ? profile.qualification : null,
         has_resume: !!(profile && profile.resume_file),
@@ -101,8 +103,8 @@ const formatProviderApplicationDetail = (row) => {
         applicant: {
             code: row.seeker.code,
             name: row.seeker.name,
-            phone: row.seeker.phone,
-            email: row.seeker.email,
+            phone: row.seeker.deleted ? null : row.seeker.phone,
+            email: row.seeker.deleted ? null : row.seeker.email,
             job_category_code: profile ? profile.job_category_code : null,
             job_category_name: profile && profile.jobCategory ? profile.jobCategory.name : null,
             gender: profile ? profile.gender : null,
@@ -457,6 +459,26 @@ exports.withdrawApplication = async (code, seeker_user_code, meta = {}) => {
         }, { where: { code, seeker_user_code, application_status: APPLICATION_STATUS.APPLIED, deleted: false } });
 
         return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// Account deletion: the seeker's live applications are withdrawn, except hires, which stay so
+// the job's hired_count keeps matching its hired applications
+exports.withdrawAllForSeeker = async (seeker_user_code, meta = {}, transaction = null) => {
+    try {
+        const [withdrawn] = await db.application.update({
+            deleted: true,
+            status: 'inactive',
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, {
+            where: { seeker_user_code, deleted: false, application_status: { [Op.ne]: APPLICATION_STATUS.HIRED } },
+            transaction
+        });
+        return withdrawn;
     } catch (err) {
         throw err;
     }

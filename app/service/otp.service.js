@@ -90,3 +90,14 @@ exports.consumeOtp = async ({ user_code, purpose, otp }, transaction) => {
         throw err;
     }
 };
+
+exports.retireAll = async (user_code, transaction = null) => {
+    try {
+        await db.userOtp.update(
+            { deleted: true, status: 'inactive', modified_at: new Date() },
+            { where: { user_code, deleted: false }, transaction }
+        );
+    } catch (err) {
+        throw err;
+    }
+};

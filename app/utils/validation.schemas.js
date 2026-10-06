@@ -71,6 +71,11 @@ exports.userSchemas = {
         otp: otpCode.required()
     }),
 
+    // deleting the account needs the password again
+    deleteAccount: Joi.object({
+        password: Joi.string().required()
+    }),
+
     // admin: clear the failed-login lockout of an account
     unlockUser: Joi.object({
         username: Joi.string().trim().max(150).required()      // email, phone or user code
@@ -373,5 +378,50 @@ exports.talentSchemas = {
 
     usercode: Joi.object({
         usercode: businessCode.required()
+    })
+};
+
+// ─── Admin ────────────────────────────────────────────────────────────────
+
+exports.adminSchemas = {
+    getUsers: Joi.object({
+        page: commonPatterns.page,
+        limit: commonPatterns.limit,
+        search: Joi.string().trim().max(100).optional(),
+        role_key: Joi.string().valid('admin', 'job_provider', 'job_seeker').optional(),
+        status: commonPatterns.status.optional(),
+        locked: Joi.boolean().optional(),
+        verified: Joi.boolean().optional()
+    }),
+
+    usercode: Joi.object({
+        usercode: businessCode.required()
+    }),
+
+    updateUserStatus: Joi.object({
+        status: commonPatterns.status.required()
+    }),
+
+    updateProviderVerification: Joi.object({
+        is_verified: Joi.boolean().required()
+    }),
+
+    getJobs: Joi.object({
+        page: commonPatterns.page,
+        limit: commonPatterns.limit,
+        search: Joi.string().trim().max(100).optional(),
+        provider_user_code: businessCode.optional(),
+        job_category_code: businessCode.optional(),
+        job_status: Joi.string().valid(...Object.values(JOB_STATUS)).optional(),
+        taken_down: Joi.boolean().optional()
+    }),
+
+    jobid: Joi.object({
+        jobid: businessCode.required()
+    }),
+
+    moderateJob: Joi.object({
+        action: Joi.string().valid('takedown', 'restore').required(),
+        reason: Joi.when('action', { is: 'takedown', then: Joi.string().trim().min(5).max(500).required(), otherwise: Joi.any().strip() })
     })
 };

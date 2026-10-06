@@ -9,6 +9,8 @@ exports.setup = (app) => {
         app.use('/api/v1/dashboard', require('./dashboard.router'));
         app.use('/api/v1/public', require('./public.router'));
         app.use('/api/v1/talent', require('./talent.router'));
+        app.use('/api/v1/admin', require('./admin.router'));
+        app.use('/api/v1/health', require('./health.router'));
 
         console.log("Routing Setup Completed [✓]");
     } catch (err) {

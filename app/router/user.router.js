@@ -20,7 +20,12 @@ router.route("/register")
     .post(registerLimiter, validateBody(userSchemas.register), userCtrl.registerUser);
 
 router.route("/me")
-    .get(authMiddleware.protect, userCtrl.getMe);
+    .get(authMiddleware.protect, userCtrl.getMe)
+    // providers and seekers only: the admin account isn't self-service
+    .delete(authMiddleware.protect, authMiddleware.restrictTo(ROLE_CODES.JOB_PROVIDER, ROLE_CODES.JOB_SEEKER), authMiddleware.checkApiModuleAccess, validateBody(userSchemas.deleteAccount), userCtrl.deleteMyAccount);
+
+router.route("/me/export")
+    .get(authMiddleware.protect, userCtrl.exportMyAccount);
 
 // =====================
 // PASSWORD & SESSION ROUTES

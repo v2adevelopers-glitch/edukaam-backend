@@ -200,6 +200,32 @@ const confirmVerification = async (req, res) => {
     }
 };
 
+// ─── Delete / export my account ───────────────────────────────────────────
+
+const exportMyAccount = async (req, res) => {
+    try {
+        const user = await userService.getUserByCode(req.user.code);
+        const result = await accountService.exportAccount(user);
+        successResponse(res, "Account data exported", result.data);
+    } catch (err) {
+        errorResponse(res, 'exportMyAccount', err);
+    }
+};
+
+const deleteMyAccount = async (req, res) => {
+    try {
+        const user = await userService.getUserByCode(req.user.code);
+        if (!user.password || !await bcrypt.compare(req.body.password, user.password)) {
+            throw new CustomError('invalid_password', 400, "The password is wrong");
+        }
+
+        await accountService.deleteAccount(user, getMeta(req));
+        successResponse(res, "Your account has been deleted");
+    } catch (err) {
+        errorResponse(res, 'deleteMyAccount', err);
+    }
+};
+
 // ─── Account administration ───────────────────────────────────────────────
 
 const unlockUser = async (req, res) => {
@@ -235,6 +261,9 @@ module.exports = {
     // Verification
     sendVerification,
     confirmVerification,
+    // Delete / export my account
+    exportMyAccount,
+    deleteMyAccount,
     // Account administration
     unlockUser
 };
