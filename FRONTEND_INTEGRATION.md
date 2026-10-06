@@ -92,7 +92,7 @@ These come from the placeholder endpoints and fields the demo layer used.
 | Job state field | `status` | `job_status`: `open` / `closed`. The audit `status` column (`active`/`inactive`) is never returned on jobs |
 | Application state field | `status` | `application_status`: `applied` / `shortlisted` / `interview` / `hired` / `rejected` |
 | "Job closed" toast after a hire | decided on the client | `PATCH /application/applications/:applicationid` returns `resData.job_auto_closed: true` when that hire filled the last vacancy and closed the job (plus `job_status`, `hired_count`, `vacancies`) |
-| Find Jobs category | chosen by the user | **Not a filter any more**: the API always uses the seeker's own `job_category_code` from the profile. Offer institution type, job type, state, city and search instead |
+| Find Jobs category | chosen by the user | The API always uses the seeker's own categories from the profile (primary + up to 2 additional). `job_category_code` may narrow to one of them; any other is `400 category_not_in_profile`. Offer the profile's categories as the filter options |
 
 ### 2.2 Check these against the demo data
 
@@ -115,6 +115,9 @@ The demo data could not be inspected (see the note above). Each row states what 
 | Withdraw button | show only when `can_withdraw` is `true` (status still `applied`) |
 | Apply button | disable when `already_applied` or `is_expired` is `true`; applying needs `qualification` and `experience_years` in the profile (`400 profile_incomplete` otherwise) |
 | Dashboard charts | `applications_by_status` is an array of `{ application_status, count }` for all five statuses in a fixed order |
+| Session end | any `401` (including `token_revoked` after logout everywhere, a password change elsewhere, or deactivation) means: clear the token and go to login |
+| Logos | `logo_url` / `institution_logo_url` are paths relative to the API host (`/api/v1/public/logos/…`); prefix them with the API base origin |
+| Downloads | resume downloads and the applicants CSV are files, not JSON: fetch them as a blob with the `x-access-token` header (a plain `<a href>` can't send it) |
 
 ---
 
@@ -142,8 +145,10 @@ Body:
     "phone": "0000100001",
     "email": "hr.greenfield@example.com",
     "status": "active",
+    "email_verified": false,
+    "phone_verified": false,
     "last_login": null,
-    "created_at": "2026-08-07T12:08:16.000Z"
+    "created_at": "2026-08-07T14:42:43.000Z"
   },
   "profile_res": {
     "user_code": "EDJUSR00002",
@@ -161,7 +166,9 @@ Body:
     "city_code": "EDJCTY00150",
     "city_name": "Noida",
     "pincode": "201309",
-    "modified_at": "2026-08-07T12:08:22.000Z"
+    "logo_url": null,
+    "institution_verified": false,
+    "modified_at": "2026-08-07T14:42:49.000Z"
   },
   "role_info": {
     "code": 1002,
@@ -214,8 +221,10 @@ Errors: `400 email_exists`, `phone_exists`, `invalid_job_category_code`, `invali
     "phone": "0000100001",
     "email": "hr.greenfield@example.com",
     "status": "active",
-    "last_login": "2026-10-06T12:08:22.000Z",
-    "created_at": "2026-08-07T12:08:16.000Z"
+    "email_verified": false,
+    "phone_verified": false,
+    "last_login": "2026-10-06T14:42:50.000Z",
+    "created_at": "2026-08-07T14:42:43.000Z"
   },
   "profile_res": {
     "user_code": "EDJUSR00002",
@@ -233,7 +242,9 @@ Errors: `400 email_exists`, `phone_exists`, `invalid_job_category_code`, `invali
     "city_code": "EDJCTY00150",
     "city_name": "Noida",
     "pincode": "201309",
-    "modified_at": "2026-08-07T12:08:22.000Z"
+    "logo_url": null,
+    "institution_verified": false,
+    "modified_at": "2026-08-07T14:42:49.000Z"
   },
   "role_info": {
     "code": 1002,
@@ -265,7 +276,7 @@ Errors: `400 email_exists`, `phone_exists`, `invalid_job_category_code`, `invali
       "route_to": null,
       "children": [
         {
-          "id": 8,
+          "id": 10,
           "name": "Post a Job",
           "icon": "add_circle",
           "slug": "post-job",
@@ -273,7 +284,7 @@ Errors: `400 email_exists`, `phone_exists`, `invalid_job_category_code`, `invali
           "children": []
         },
         {
-          "id": 9,
+          "id": 11,
           "name": "My Jobs",
           "icon": "list",
           "slug": "my-jobs",
@@ -288,6 +299,14 @@ Errors: `400 email_exists`, `phone_exists`, `invalid_job_category_code`, `invali
       "icon": "people",
       "slug": "applicants",
       "route_to": "/applications/list",
+      "children": []
+    },
+    {
+      "id": 9,
+      "name": "Find Candidates",
+      "icon": "person_search",
+      "slug": "find-candidates",
+      "route_to": "/candidates/list",
       "children": []
     }
   ]
@@ -333,6 +352,14 @@ Errors: `400 email_exists`, `phone_exists`, `invalid_job_category_code`, `invali
       "icon": "assignment",
       "slug": "my-applications",
       "route_to": "/my-applications/list",
+      "children": []
+    },
+    {
+      "id": 8,
+      "name": "Saved Jobs",
+      "icon": "bookmark",
+      "slug": "saved-jobs",
+      "route_to": "/saved-jobs/list",
       "children": []
     }
   ]
@@ -430,8 +457,10 @@ Admin-only writes (not used by the frontend): `POST`, `PATCH`, `DELETE` on each 
     "phone": "0000100001",
     "email": "hr.greenfield@example.com",
     "status": "active",
-    "last_login": "2026-10-06T12:08:22.000Z",
-    "created_at": "2026-08-07T12:08:16.000Z"
+    "email_verified": false,
+    "phone_verified": false,
+    "last_login": "2026-10-06T14:42:50.000Z",
+    "created_at": "2026-08-07T14:42:43.000Z"
   },
   "profile_res": {
     "user_code": "EDJUSR00002",
@@ -449,7 +478,9 @@ Admin-only writes (not used by the frontend): `POST`, `PATCH`, `DELETE` on each 
     "city_code": "EDJCTY00150",
     "city_name": "Noida",
     "pincode": "201309",
-    "modified_at": "2026-08-07T12:08:22.000Z"
+    "logo_url": null,
+    "institution_verified": false,
+    "modified_at": "2026-08-07T14:42:49.000Z"
   }
 }
 ```
@@ -473,8 +504,10 @@ Body: any of `name`, `phone`, `email`, `institution_name`, `institution_type_cod
     "phone": "0000100001",
     "email": "hr.greenfield@example.com",
     "status": "active",
-    "last_login": "2026-10-06T12:13:32.000Z",
-    "created_at": "2026-08-07T12:08:16.000Z"
+    "email_verified": false,
+    "phone_verified": false,
+    "last_login": "2026-10-06T14:42:51.000Z",
+    "created_at": "2026-08-07T14:42:43.000Z"
   },
   "profile_res": {
     "user_code": "EDJUSR00002",
@@ -492,7 +525,9 @@ Body: any of `name`, `phone`, `email`, `institution_name`, `institution_type_cod
     "city_code": "EDJCTY00150",
     "city_name": "Noida",
     "pincode": "201309",
-    "modified_at": "2026-10-06T12:13:33.000Z"
+    "logo_url": null,
+    "institution_verified": false,
+    "modified_at": "2026-10-06T14:42:52.000Z"
   }
 }
 ```
@@ -510,8 +545,10 @@ Errors: `400 email_exists`, `phone_exists`, `invalid_*_code`, `city_state_mismat
     "phone": "0000200001",
     "email": "aarav.sharma@example.com",
     "status": "active",
-    "last_login": "2026-10-06T12:08:23.000Z",
-    "created_at": "2026-08-07T12:08:17.000Z"
+    "email_verified": false,
+    "phone_verified": false,
+    "last_login": "2026-10-06T14:42:50.000Z",
+    "created_at": "2026-08-07T14:42:45.000Z"
   },
   "profile_res": {
     "user_code": "EDJUSR00008",
@@ -528,7 +565,16 @@ Errors: `400 email_exists`, `phone_exists`, `invalid_*_code`, `city_state_mismat
     "city_code": "EDJCTY00150",
     "city_name": "Noida",
     "about": "Primary Teacher with 3 years of experience.",
-    "modified_at": "2026-08-07T12:08:22.000Z"
+    "has_resume": false,
+    "resume_name": null,
+    "resume_uploaded_at": null,
+    "is_discoverable": false,
+    "share_contact": false,
+    "modified_at": "2026-08-07T14:42:49.000Z",
+    "additional_job_categories": [],
+    "job_category_codes": [
+      "EDJCAT00001"
+    ]
   }
 }
 ```
@@ -573,8 +619,10 @@ Query: `page`, `limit`, `search` (title), `job_category_code`, `job_type` (`full
       "description": "Greenfield Public School is hiring: School Bus Driver. 2 vacancies.",
       "job_status": "open",
       "is_expired": false,
-      "created_at": "2026-09-10T12:08:22.000Z",
-      "modified_at": "2026-09-10T12:08:22.000Z"
+      "taken_down": false,
+      "takedown_reason": null,
+      "created_at": "2026-09-10T14:42:49.000Z",
+      "modified_at": "2026-09-10T14:42:49.000Z"
     }
   ],
   "pagination": {
@@ -610,8 +658,10 @@ Query: `page`, `limit`, `search` (title), `job_category_code`, `job_type` (`full
   "description": "Greenfield Public School is hiring: School Bus Driver. 2 vacancies.",
   "job_status": "open",
   "is_expired": false,
-  "created_at": "2026-09-10T12:08:22.000Z",
-  "modified_at": "2026-09-10T12:08:22.000Z"
+  "taken_down": false,
+  "takedown_reason": null,
+  "created_at": "2026-09-10T14:42:49.000Z",
+  "modified_at": "2026-09-10T14:42:49.000Z"
 }
 ```
 
@@ -656,8 +706,10 @@ Query: `page`, `limit`, `search` (title), `job_category_code`, `job_type` (`full
   "description": "Teach EVS to classes III-V.",
   "job_status": "open",
   "is_expired": false,
-  "created_at": "2026-10-06T12:13:33.000Z",
-  "modified_at": "2026-10-06T12:13:33.000Z"
+  "taken_down": false,
+  "takedown_reason": null,
+  "created_at": "2026-10-06T14:42:52.000Z",
+  "modified_at": "2026-10-06T14:42:52.000Z"
 }
 ```
 
@@ -708,6 +760,8 @@ Query: `page`, `limit`, `search` (title or institution name), `institution_type_
       "institution_name": "Riverside International School",
       "institution_type_code": "EDJITY00001",
       "institution_type_name": "School",
+      "institution_logo_url": null,
+      "institution_verified": false,
       "state_code": "EDJSTA00011",
       "state_name": "Karnataka",
       "city_code": "EDJCTY00064",
@@ -720,9 +774,10 @@ Query: `page`, `limit`, `search` (title or institution name), `institution_type_
       "last_date": "2026-11-08",
       "description": "Riverside International School is hiring: Pre-Primary Teacher. 1 vacancy.",
       "job_status": "open",
-      "already_applied": true,
       "is_expired": false,
-      "posted_at": "2026-09-23T12:08:22.000Z"
+      "posted_at": "2026-09-23T14:42:49.000Z",
+      "already_applied": true,
+      "is_saved": false
     }
   ],
   "pagination": {
@@ -748,6 +803,8 @@ Query: `page`, `limit`, `search` (title or institution name), `institution_type_
   "institution_name": "Riverside International School",
   "institution_type_code": "EDJITY00001",
   "institution_type_name": "School",
+  "institution_logo_url": null,
+  "institution_verified": false,
   "state_code": "EDJSTA00011",
   "state_name": "Karnataka",
   "city_code": "EDJCTY00064",
@@ -760,15 +817,16 @@ Query: `page`, `limit`, `search` (title or institution name), `institution_type_
   "last_date": "2026-11-08",
   "description": "Riverside International School is hiring: Pre-Primary Teacher. 1 vacancy.",
   "job_status": "open",
-  "already_applied": true,
   "is_expired": false,
-  "posted_at": "2026-09-23T12:08:22.000Z",
+  "posted_at": "2026-09-23T14:42:49.000Z",
+  "already_applied": true,
+  "is_saved": false,
   "institution_website": null,
   "institution_about": "International curriculum day school with transport facility.",
   "my_application": {
     "code": "EDJAPP00005",
     "application_status": "applied",
-    "applied_at": "2026-10-02T12:08:22.000Z"
+    "applied_at": "2026-10-02T14:42:49.000Z"
   }
 }
 ```
@@ -794,9 +852,12 @@ Query: `page`, `limit`, `search` (applicant name or phone), `job_code`, `applica
       "applicant_email": "neha.singh@example.com",
       "experience_years": 5,
       "qualification": "M.Sc Physics, B.Ed",
+      "has_resume": false,
       "application_status": "applied",
-      "applied_at": "2026-09-30T12:08:22.000Z",
-      "status_changed_at": null
+      "applied_at": "2026-09-30T14:42:49.000Z",
+      "status_changed_at": null,
+      "interview_at": null,
+      "interview_mode": null
     }
   ],
   "pagination": {
@@ -819,8 +880,14 @@ Query: `page`, `limit`, `search` (applicant name or phone), `job_code`, `applica
   "vacancies": 1,
   "hired_count": 0,
   "application_status": "applied",
-  "applied_at": "2026-09-30T12:08:22.000Z",
+  "applied_at": "2026-09-30T14:42:49.000Z",
   "status_changed_at": null,
+  "cover_note": null,
+  "provider_notes": null,
+  "interview_at": null,
+  "interview_mode": null,
+  "interview_location": null,
+  "interview_notes": null,
   "applicant": {
     "code": "EDJUSR00011",
     "name": "Neha Singh",
@@ -838,7 +905,10 @@ Query: `page`, `limit`, `search` (applicant name or phone), `job_code`, `applica
     "state_name": "Karnataka",
     "city_code": "EDJCTY00064",
     "city_name": "Bengaluru",
-    "about": "Secondary Teacher with 5 years of experience."
+    "about": "Secondary Teacher with 5 years of experience.",
+    "has_resume": false,
+    "resume_name": null,
+    "additional_job_categories": []
   }
 }
 ```
@@ -857,7 +927,8 @@ Body: `{ "application_status": "shortlisted" | "interview" | "hired" | "rejected
     "job_code": "EDJJOB00026",
     "application_status": "hired",
     "previous_status": "applied",
-    "status_changed_at": "2026-10-06T12:13:33.407Z",
+    "status_changed_at": "2026-10-06T14:42:52.335Z",
+    "rescheduled": false,
     "job_status": "closed",
     "vacancies": 1,
     "hired_count": 1,
@@ -874,7 +945,8 @@ Any other change:
   "job_code": "EDJJOB00002",
   "application_status": "shortlisted",
   "previous_status": "applied",
-  "status_changed_at": "2026-10-06T12:13:33.432Z",
+  "status_changed_at": "2026-10-06T14:42:52.350Z",
+  "rescheduled": false,
   "job_status": "open",
   "vacancies": 1,
   "hired_count": 0,
@@ -903,13 +975,19 @@ Query: `page`, `limit`, `search` (job title), `application_status`.
       "institution_name": "Riverside International School",
       "institution_type_code": "EDJITY00001",
       "institution_type_name": "School",
+      "institution_logo_url": null,
+      "institution_verified": false,
       "state_code": "EDJSTA00011",
       "state_name": "Karnataka",
       "city_code": "EDJCTY00064",
       "city_name": "Bengaluru",
       "application_status": "applied",
-      "applied_at": "2026-10-02T12:08:22.000Z",
+      "applied_at": "2026-10-02T14:42:49.000Z",
       "status_changed_at": null,
+      "interview_at": null,
+      "interview_mode": null,
+      "interview_location": null,
+      "interview_notes": null,
       "can_withdraw": true
     }
   ],
@@ -935,13 +1013,19 @@ Query: `page`, `limit`, `search` (job title), `application_status`.
   "institution_name": "Riverside International School",
   "institution_type_code": "EDJITY00001",
   "institution_type_name": "School",
+  "institution_logo_url": null,
+  "institution_verified": false,
   "state_code": "EDJSTA00011",
   "state_name": "Karnataka",
   "city_code": "EDJCTY00064",
   "city_name": "Bengaluru",
   "application_status": "applied",
-  "applied_at": "2026-10-02T12:08:22.000Z",
+  "applied_at": "2026-10-02T14:42:49.000Z",
   "status_changed_at": null,
+  "interview_at": null,
+  "interview_mode": null,
+  "interview_location": null,
+  "interview_notes": null,
   "can_withdraw": true,
   "salary_min": 22000,
   "salary_max": 30000,
@@ -949,7 +1033,8 @@ Query: `page`, `limit`, `search` (job title), `application_status`.
   "min_qualification": "NTT or B.Ed",
   "min_experience_years": 1,
   "last_date": "2026-11-08",
-  "description": "Riverside International School is hiring: Pre-Primary Teacher. 1 vacancy."
+  "description": "Riverside International School is hiring: Pre-Primary Teacher. 1 vacancy.",
+  "cover_note": null
 }
 ```
 
@@ -968,13 +1053,19 @@ Body: `{ "job_code": "EDJJOB00026" }`. `resData` has the same shape as the detai
   "institution_name": "Greenfield Public School",
   "institution_type_code": "EDJITY00001",
   "institution_type_name": "School",
+  "institution_logo_url": null,
+  "institution_verified": false,
   "state_code": "EDJSTA00026",
   "state_name": "Uttar Pradesh",
   "city_code": "EDJCTY00150",
   "city_name": "Noida",
   "application_status": "applied",
-  "applied_at": "2026-10-06T12:13:33.000Z",
+  "applied_at": "2026-10-06T14:42:52.000Z",
   "status_changed_at": null,
+  "interview_at": null,
+  "interview_mode": null,
+  "interview_location": null,
+  "interview_notes": null,
   "can_withdraw": true,
   "salary_min": 20000,
   "salary_max": 26000,
@@ -982,7 +1073,8 @@ Body: `{ "job_code": "EDJJOB00026" }`. `resData` has the same shape as the detai
   "min_qualification": "B.Ed",
   "min_experience_years": 1,
   "last_date": "2026-12-15",
-  "description": "Teach EVS to classes III-V."
+  "description": "Teach EVS to classes III-V.",
+  "cover_note": null
 }
 ```
 
@@ -1062,7 +1154,7 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
     {
       "application_code": "EDJAPP00008",
       "application_status": "applied",
-      "applied_at": "2026-09-30T12:08:22.000Z",
+      "applied_at": "2026-09-30T14:42:49.000Z",
       "job_code": "EDJJOB00002",
       "job_title": "TGT Mathematics",
       "applicant_code": "EDJUSR00011",
@@ -1073,7 +1165,7 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
     {
       "application_code": "EDJAPP00041",
       "application_status": "shortlisted",
-      "applied_at": "2026-09-24T12:08:22.000Z",
+      "applied_at": "2026-09-24T14:42:49.000Z",
       "job_code": "EDJJOB00003",
       "job_title": "School Bus Driver",
       "applicant_code": "EDJUSR00025",
@@ -1084,7 +1176,7 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
     {
       "application_code": "EDJAPP00009",
       "application_status": "rejected",
-      "applied_at": "2026-09-22T12:08:22.000Z",
+      "applied_at": "2026-09-22T14:42:49.000Z",
       "job_code": "EDJJOB00002",
       "job_title": "TGT Mathematics",
       "applicant_code": "EDJUSR00012",
@@ -1095,7 +1187,7 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
     {
       "application_code": "EDJAPP00007",
       "application_status": "interview",
-      "applied_at": "2026-09-21T12:08:22.000Z",
+      "applied_at": "2026-09-21T14:42:49.000Z",
       "job_code": "EDJJOB00002",
       "job_title": "TGT Mathematics",
       "applicant_code": "EDJUSR00010",
@@ -1106,7 +1198,7 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
     {
       "application_code": "EDJAPP00002",
       "application_status": "shortlisted",
-      "applied_at": "2026-09-18T12:08:22.000Z",
+      "applied_at": "2026-09-18T14:42:49.000Z",
       "job_code": "EDJJOB00001",
       "job_title": "Primary Teacher - English",
       "applicant_code": "EDJUSR00009",
@@ -1159,6 +1251,8 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
       "institution_name": "Riverside International School",
       "institution_type_code": "EDJITY00001",
       "institution_type_name": "School",
+      "institution_logo_url": null,
+      "institution_verified": false,
       "state_code": "EDJSTA00011",
       "state_name": "Karnataka",
       "city_code": "EDJCTY00064",
@@ -1171,9 +1265,10 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
       "last_date": "2026-11-08",
       "description": "Riverside International School is hiring: Pre-Primary Teacher. 1 vacancy.",
       "job_status": "open",
-      "already_applied": true,
       "is_expired": false,
-      "posted_at": "2026-09-23T12:08:22.000Z"
+      "posted_at": "2026-09-23T14:42:49.000Z",
+      "already_applied": true,
+      "is_saved": false
     },
     {
       "code": "EDJJOB00001",
@@ -1184,6 +1279,8 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
       "institution_name": "Greenfield Public School",
       "institution_type_code": "EDJITY00001",
       "institution_type_name": "School",
+      "institution_logo_url": null,
+      "institution_verified": false,
       "state_code": "EDJSTA00026",
       "state_name": "Uttar Pradesh",
       "city_code": "EDJCTY00150",
@@ -1196,10 +1293,719 @@ Withdraws (only while `application_status` is `applied`; `400 application_not_wi
       "last_date": "2026-10-31",
       "description": "Greenfield Public School is hiring: Primary Teacher - English. 2 vacancies.",
       "job_status": "open",
-      "already_applied": true,
       "is_expired": false,
-      "posted_at": "2026-09-06T12:08:22.000Z"
+      "posted_at": "2026-09-06T14:42:49.000Z",
+      "already_applied": true,
+      "is_saved": false
     }
   ]
 }
 ```
+
+---
+
+## 4. Added after the first release
+
+Everything below is new; none of it changes the endpoints above except where noted (new fields are additive).
+
+### 4.1 Password, sessions and verification
+
+#### `PATCH /api/v1/users/password`
+
+Body `{ "current_password": "...", "new_password": "..." }` (same rules as registration). Every other session ends; **replace the stored token** with the one returned:
+
+```json
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Password changed successfully",
+  "resData": {
+    "token": "<new jwt>"
+  }
+}
+```
+
+Errors: `400 invalid_current_password`, `password_unchanged`, `VALIDATION_ERROR`.
+
+#### `POST /api/v1/users/logout`
+
+No body. Ends every session of the user on all devices (their tokens get `401 token_revoked`). Clear the stored token afterwards.
+
+#### `POST /api/v1/users/forgot-password` (public)
+
+Body `{ "username": "<email or 10-digit phone>" }`. A 6-digit code goes to that email, or by SMS to that phone. The answer is identical whether or not the account exists:
+
+```json
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "If an account exists for this username, a reset code has been sent to it",
+  "resData": {
+    "channel": "email"
+  }
+}
+```
+
+#### `POST /api/v1/users/reset-password` (public)
+
+Body `{ "username", "otp", "new_password" }`. Also clears a login lockout and ends all sessions; send the user to login.
+
+```json
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Password reset successfully, please log in"
+}
+```
+
+```json
+{
+  "statusCode": 400,
+  "success": false,
+  "message": "The code is invalid or has expired",
+  "resData": {
+    "error": "otp_invalid"
+  }
+}
+```
+
+Codes expire after 10 minutes and allow 5 wrong tries (`otp_attempts_exceeded`: ask for a new code). A new code can be requested every 60 seconds.
+
+#### `POST /api/v1/users/verify/send` and `POST /api/v1/users/verify/confirm`
+
+Body `{ "channel": "email" | "phone" }`, then `{ "channel", "otp" }`. `user_info` now always carries `email_verified` and `phone_verified`; changing the email or phone in the profile clears its flag.
+
+```json
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Verification code sent",
+  "resData": {
+    "channel": "email",
+    "destination": "aarav.sharma@example.com"
+  }
+}
+```
+
+```json
+{
+  "user_info": {
+    "code": "EDJUSR00008",
+    "role_code": 1003,
+    "name": "Aarav Sharma",
+    "phone": "0000200001",
+    "email": "aarav.sharma@example.com",
+    "status": "active",
+    "email_verified": true,
+    "phone_verified": false,
+    "last_login": "2026-10-06T14:42:55.000Z",
+    "created_at": "2026-08-07T14:42:45.000Z"
+  }
+}
+```
+
+Asking again within 60 seconds:
+
+```json
+{
+  "statusCode": 429,
+  "success": false,
+  "message": "Please wait 60 seconds before requesting another code",
+  "resData": {
+    "error": "otp_cooldown"
+  }
+}
+```
+
+### 4.2 Files
+
+Uploads are `multipart/form-data` with the file in the field **`file`**. Errors: `400 file_missing`, `invalid_upload`, `invalid_file_type`, `file_too_large`.
+
+| Endpoint | Who | Files |
+|---|---|---|
+| `PUT /api/v1/profile/seeker/me/resume` | seeker | PDF, DOC, DOCX, max 5 MB |
+| `GET /api/v1/profile/seeker/me/resume` | seeker | downloads own resume (file) |
+| `DELETE /api/v1/profile/seeker/me/resume` | seeker | |
+| `PUT /api/v1/profile/provider/me/logo` | provider | PNG, JPEG, WebP, max 1 MB |
+| `DELETE /api/v1/profile/provider/me/logo` | provider | |
+| `GET /api/v1/application/applications/:applicationid/resume` | provider (owner of the job) | downloads the applicant's resume (file) |
+| `GET /api/v1/public/logos/:filename` | public | the logo image (use `logo_url`) |
+
+Resume upload `resData` (the seeker profile gained `has_resume`, `resume_name`, `resume_uploaded_at`):
+
+```json
+{
+  "profile_res": {
+    "user_code": "EDJUSR00008",
+    "job_category_code": "EDJCAT00001",
+    "job_category_name": "Primary Teacher",
+    "gender": "male",
+    "date_of_birth": "1996-03-14",
+    "qualification": "B.Ed, B.A. English",
+    "experience_years": 3,
+    "skills": "Phonics, Classroom management, Storytelling",
+    "expected_salary": 24000,
+    "state_code": "EDJSTA00026",
+    "state_name": "Uttar Pradesh",
+    "city_code": "EDJCTY00150",
+    "city_name": "Noida",
+    "about": "Primary Teacher with 3 years of experience.",
+    "has_resume": true,
+    "resume_name": "Aarav-Sharma-CV.pdf",
+    "resume_uploaded_at": "2026-10-06T14:42:56.000Z",
+    "is_discoverable": false,
+    "share_contact": false,
+    "modified_at": "2026-10-06T14:42:56.000Z",
+    "additional_job_categories": [],
+    "job_category_codes": [
+      "EDJCAT00001"
+    ]
+  }
+}
+```
+
+Logo upload (the provider profile gained `logo_url` and `institution_verified`):
+
+```json
+{
+  "profile_res": {
+    "user_code": "EDJUSR00007",
+    "institution_name": "Riverside International School",
+    "institution_type_code": "EDJITY00001",
+    "institution_type_name": "School",
+    "contact_person": "Lakshmi Menon",
+    "designation": "Principal's Office",
+    "established_year": 2010,
+    "website": null,
+    "about": "International curriculum day school with transport facility.",
+    "address": "Sarjapur Road",
+    "state_code": "EDJSTA00011",
+    "state_name": "Karnataka",
+    "city_code": "EDJCTY00064",
+    "city_name": "Bengaluru",
+    "pincode": "560035",
+    "logo_url": "/api/v1/public/logos/6a602e2d-d239-4f09-baef-2743b96fa435.png",
+    "institution_verified": false,
+    "modified_at": "2026-10-06T14:42:56.000Z"
+  }
+}
+```
+
+### 4.3 Seeker profile: more categories and candidate-search opt-ins
+
+`PATCH /api/v1/profile/seeker/me` also accepts:
+
+| Field | Meaning |
+|---|---|
+| `additional_job_category_codes` | Up to 2 extra categories (array; replaces the set; `[]` removes them). Openings, apply, saved jobs and the dashboard use primary + additional |
+| `is_discoverable` | `true` lists the seeker in provider candidate search (without contact details) |
+| `share_contact` | `true` lets **verified** institutions see phone, email and resume in candidate search |
+
+```json
+{
+  "user_info": {
+    "code": "EDJUSR00008",
+    "role_code": 1003,
+    "name": "Aarav Sharma",
+    "phone": "0000200001",
+    "email": "aarav.sharma@example.com",
+    "status": "active",
+    "email_verified": true,
+    "phone_verified": false,
+    "last_login": "2026-10-06T14:42:55.000Z",
+    "created_at": "2026-08-07T14:42:45.000Z"
+  },
+  "profile_res": {
+    "user_code": "EDJUSR00008",
+    "job_category_code": "EDJCAT00001",
+    "job_category_name": "Primary Teacher",
+    "gender": "male",
+    "date_of_birth": "1996-03-14",
+    "qualification": "B.Ed, B.A. English",
+    "experience_years": 3,
+    "skills": "Phonics, Classroom management, Storytelling",
+    "expected_salary": 24000,
+    "state_code": "EDJSTA00026",
+    "state_name": "Uttar Pradesh",
+    "city_code": "EDJCTY00150",
+    "city_name": "Noida",
+    "about": "Primary Teacher with 3 years of experience.",
+    "has_resume": true,
+    "resume_name": "Aarav-Sharma-CV.pdf",
+    "resume_uploaded_at": "2026-10-06T14:42:56.000Z",
+    "is_discoverable": true,
+    "share_contact": false,
+    "modified_at": "2026-10-06T14:42:56.000Z",
+    "additional_job_categories": [
+      {
+        "code": "EDJCAT00002",
+        "name": "Secondary Teacher"
+      }
+    ],
+    "job_category_codes": [
+      "EDJCAT00001",
+      "EDJCAT00002"
+    ]
+  }
+}
+```
+
+### 4.4 Openings, saved jobs and the public job list
+
+Opening rows gained `institution_logo_url`, `institution_verified` and `is_saved`; `GET /job/openings` accepts `job_category_code` (one of the seeker's own categories):
+
+```json
+{
+  "data": [
+    {
+      "code": "EDJJOB00028",
+      "title": "Substitute Teacher",
+      "job_type": "part_time",
+      "job_category_code": "EDJCAT00001",
+      "job_category_name": "Primary Teacher",
+      "institution_name": "Greenfield Public School",
+      "institution_type_code": "EDJITY00001",
+      "institution_type_name": "School",
+      "institution_logo_url": null,
+      "institution_verified": false,
+      "state_code": "EDJSTA00026",
+      "state_name": "Uttar Pradesh",
+      "city_code": "EDJCTY00150",
+      "city_name": "Noida",
+      "salary_min": 12000,
+      "salary_max": 15000,
+      "vacancies": 1,
+      "min_qualification": null,
+      "min_experience_years": 0,
+      "last_date": "2026-11-30",
+      "description": null,
+      "job_status": "open",
+      "is_expired": false,
+      "posted_at": "2026-10-06T14:42:52.000Z",
+      "already_applied": false,
+      "is_saved": false
+    }
+  ],
+  "pagination": {
+    "total": 3,
+    "page": 1,
+    "limit": 1,
+    "totalPages": 3
+  }
+}
+```
+
+#### `GET /api/v1/job/saved-jobs`, `POST /api/v1/job/saved-jobs` (`{ "job_code" }`), `DELETE /api/v1/job/saved-jobs/:jobid`
+
+Seeker only. Saved rows are opening rows plus `saved_at`; closed jobs stay in the list (check `job_status`). Saving twice is fine.
+
+```json
+{
+  "statusCode": 200,
+  "success": true,
+  "message": "Job saved",
+  "resData": {
+    "job_code": "EDJJOB00028",
+    "is_saved": true
+  }
+}
+```
+
+```json
+{
+  "data": [
+    {
+      "code": "EDJJOB00028",
+      "title": "Substitute Teacher",
+      "job_type": "part_time",
+      "job_category_code": "EDJCAT00001",
+      "job_category_name": "Primary Teacher",
+      "institution_name": "Greenfield Public School",
+      "institution_type_code": "EDJITY00001",
+      "institution_type_name": "School",
+      "institution_logo_url": null,
+      "institution_verified": false,
+      "state_code": "EDJSTA00026",
+      "state_name": "Uttar Pradesh",
+      "city_code": "EDJCTY00150",
+      "city_name": "Noida",
+      "salary_min": 12000,
+      "salary_max": 15000,
+      "vacancies": 1,
+      "min_qualification": null,
+      "min_experience_years": 0,
+      "last_date": "2026-11-30",
+      "description": null,
+      "job_status": "open",
+      "is_expired": false,
+      "posted_at": "2026-10-06T14:42:52.000Z",
+      "already_applied": false,
+      "is_saved": true,
+      "saved_at": "2026-10-06T14:42:56.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 1
+  }
+}
+```
+
+#### `GET /api/v1/public/jobs`, `GET /api/v1/public/jobs/:jobid` (public)
+
+For the landing page: open, unexpired jobs, no token, no `already_applied` / `is_saved`. Query: `page`, `limit`, `search`, `job_category_code`, `institution_type_code`, `job_type`, `state_code`, `city_code`.
+
+```json
+{
+  "data": [
+    {
+      "code": "EDJJOB00028",
+      "title": "Substitute Teacher",
+      "job_type": "part_time",
+      "job_category_code": "EDJCAT00001",
+      "job_category_name": "Primary Teacher",
+      "institution_name": "Greenfield Public School",
+      "institution_type_code": "EDJITY00001",
+      "institution_type_name": "School",
+      "institution_logo_url": null,
+      "institution_verified": false,
+      "state_code": "EDJSTA00026",
+      "state_name": "Uttar Pradesh",
+      "city_code": "EDJCTY00150",
+      "city_name": "Noida",
+      "salary_min": 12000,
+      "salary_max": 15000,
+      "vacancies": 1,
+      "min_qualification": null,
+      "min_experience_years": 0,
+      "last_date": "2026-11-30",
+      "description": null,
+      "job_status": "open",
+      "is_expired": false,
+      "posted_at": "2026-10-06T14:42:52.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 19,
+    "page": 1,
+    "limit": 1,
+    "totalPages": 19
+  }
+}
+```
+
+### 4.5 Applications: cover note, interview details, notes, export, bulk
+
+- `POST /my-applications` accepts an optional `cover_note` (max 2000).
+- Moving to `interview` needs `interview_at` (future, ISO date-time) and `interview_mode` (`in_person` / `phone` / `video`), plus `interview_location` for in-person and video (address or meeting link); `interview_notes` is optional and shown to the seeker. Sending `interview` again reschedules (`rescheduled: true`).
+
+```json
+{
+  "code": "EDJAPP00005",
+  "job_code": "EDJJOB00021",
+  "application_status": "interview",
+  "previous_status": "applied",
+  "status_changed_at": "2026-10-06T14:42:56.416Z",
+  "interview_at": "2026-10-20T05:00:00.000Z",
+  "interview_mode": "in_person",
+  "interview_location": "Sarjapur Road, Bengaluru",
+  "interview_notes": "Bring your certificates",
+  "rescheduled": false,
+  "job_status": "open",
+  "vacancies": 1,
+  "hired_count": 0,
+  "job_auto_closed": false
+}
+```
+
+- `PATCH /application/applications/:applicationid/notes` with `{ "provider_notes" }`: private to the provider (never in seeker responses).
+
+Provider detail now has `cover_note`, `provider_notes`, the interview fields, `applicant.has_resume`, `applicant.resume_name` and `applicant.additional_job_categories`:
+
+```json
+{
+  "code": "EDJAPP00005",
+  "job_code": "EDJJOB00021",
+  "job_title": "Pre-Primary Teacher",
+  "job_status": "open",
+  "vacancies": 1,
+  "hired_count": 0,
+  "application_status": "interview",
+  "applied_at": "2026-10-02T14:42:49.000Z",
+  "status_changed_at": "2026-10-06T14:42:56.000Z",
+  "cover_note": null,
+  "provider_notes": "Good phonics knowledge; check references",
+  "interview_at": "2026-10-20T05:00:00.000Z",
+  "interview_mode": "in_person",
+  "interview_location": "Sarjapur Road, Bengaluru",
+  "interview_notes": "Bring your certificates",
+  "applicant": {
+    "code": "EDJUSR00008",
+    "name": "Aarav Sharma",
+    "phone": "0000200001",
+    "email": "aarav.sharma@example.com",
+    "job_category_code": "EDJCAT00001",
+    "job_category_name": "Primary Teacher",
+    "gender": "male",
+    "date_of_birth": "1996-03-14",
+    "qualification": "B.Ed, B.A. English",
+    "experience_years": 3,
+    "skills": "Phonics, Classroom management, Storytelling",
+    "expected_salary": 24000,
+    "state_code": "EDJSTA00026",
+    "state_name": "Uttar Pradesh",
+    "city_code": "EDJCTY00150",
+    "city_name": "Noida",
+    "about": "Primary Teacher with 3 years of experience.",
+    "has_resume": true,
+    "resume_name": "Aarav-Sharma-CV.pdf",
+    "additional_job_categories": [
+      {
+        "code": "EDJCAT00002",
+        "name": "Secondary Teacher"
+      }
+    ]
+  }
+}
+```
+
+Seeker detail shows the interview details (never `provider_notes`):
+
+```json
+{
+  "code": "EDJAPP00005",
+  "job_code": "EDJJOB00021",
+  "job_title": "Pre-Primary Teacher",
+  "job_type": "full_time",
+  "job_status": "open",
+  "job_category_name": "Primary Teacher",
+  "institution_name": "Riverside International School",
+  "institution_type_code": "EDJITY00001",
+  "institution_type_name": "School",
+  "institution_logo_url": "/api/v1/public/logos/6a602e2d-d239-4f09-baef-2743b96fa435.png",
+  "institution_verified": false,
+  "state_code": "EDJSTA00011",
+  "state_name": "Karnataka",
+  "city_code": "EDJCTY00064",
+  "city_name": "Bengaluru",
+  "application_status": "interview",
+  "applied_at": "2026-10-02T14:42:49.000Z",
+  "status_changed_at": "2026-10-06T14:42:56.000Z",
+  "interview_at": "2026-10-20T05:00:00.000Z",
+  "interview_mode": "in_person",
+  "interview_location": "Sarjapur Road, Bengaluru",
+  "interview_notes": "Bring your certificates",
+  "can_withdraw": false,
+  "salary_min": 22000,
+  "salary_max": 30000,
+  "vacancies": 1,
+  "min_qualification": "NTT or B.Ed",
+  "min_experience_years": 1,
+  "last_date": "2026-11-08",
+  "description": "Riverside International School is hiring: Pre-Primary Teacher. 1 vacancy.",
+  "cover_note": null
+}
+```
+
+- `PATCH /application/applications/bulk-status` with `{ "application_codes": [...max 100], "application_status", ...interview fields }`:
+
+```json
+{
+  "updated": 1,
+  "failed": 1,
+  "results": [
+    {
+      "code": "EDJAPP00013",
+      "success": true,
+      "job_code": "EDJJOB00022",
+      "job_auto_closed": false
+    },
+    {
+      "code": "EDJAPP00001",
+      "success": false,
+      "error": "application_not_found",
+      "message": "Application not found"
+    }
+  ]
+}
+```
+
+- `GET /application/applications/export` (same filters as the list) returns `text/csv`:
+
+```text
+Application code,Applied at,Status,Job code,Job title,Category,Applicant code,Applicant name,Phone,Email,Qualification,Experience (years),Interview at,Interview mode
+EDJAPP00013,2026-10-04T14:42:49.000Z,shortlisted,EDJJOB00022,TGT Science,Secondary Teacher,EDJUSR00010,Rohan Gupta,0000200003,rohan.gupta@example.com,"M.Sc Mathematics, B.Ed",7,,
+EDJAPP00042,2026-10-03T14:42:49.000Z,applied,EDJJOB00025,Van Driver,Driver,EDJUSR00025,Ramesh Pal,0000200018,ramesh.pal@example.com,"10th pass, Heavy vehicle licence",15,,
+```
+
+### 4.6 Candidate search (provider)
+
+`GET /api/v1/talent/candidates` (query: `search`, `job_category_code`, `state_code`, `city_code`, `min_experience_years`, `max_expected_salary`), `GET /api/v1/talent/candidates/:usercode`, `GET /api/v1/talent/candidates/:usercode/resume`.
+
+```json
+{
+  "data": [
+    {
+      "code": "EDJUSR00015",
+      "name": "Meera Iyer",
+      "job_category_code": "EDJCAT00004",
+      "job_category_name": "Professor",
+      "additional_job_categories": [],
+      "qualification": "Ph.D Computer Science",
+      "experience_years": 14,
+      "skills": "Machine learning, Data structures, Research guidance",
+      "expected_salary": 120000,
+      "state_code": "EDJSTA00014",
+      "state_name": "Maharashtra",
+      "city_code": "EDJCTY00087",
+      "city_name": "Pune",
+      "has_resume": false,
+      "updated_at": "2026-10-06T14:42:56.000Z"
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 1
+  }
+}
+```
+
+Detail; `phone`/`email` are filled only when `contact_visible` (the candidate shares contact **and** this institution is verified); otherwise `contact_hidden_reason` is `candidate_not_sharing` or `institution_not_verified`:
+
+```json
+{
+  "code": "EDJUSR00015",
+  "name": "Meera Iyer",
+  "job_category_code": "EDJCAT00004",
+  "job_category_name": "Professor",
+  "additional_job_categories": [],
+  "qualification": "Ph.D Computer Science",
+  "experience_years": 14,
+  "skills": "Machine learning, Data structures, Research guidance",
+  "expected_salary": 120000,
+  "state_code": "EDJSTA00014",
+  "state_name": "Maharashtra",
+  "city_code": "EDJCTY00087",
+  "city_name": "Pune",
+  "has_resume": false,
+  "updated_at": "2026-10-06T14:42:56.000Z",
+  "gender": "female",
+  "about": "Professor with 14 years of experience.",
+  "contact_visible": true,
+  "phone": "0000200008",
+  "email": "meera.iyer@example.com",
+  "contact_hidden_reason": null
+}
+```
+
+### 4.7 Account data and deletion
+
+- `GET /api/v1/users/me/export`: everything stored about the user (seekers: profile, applications, saved jobs; providers: profile, jobs). Offer it as a JSON download. Shortened example:
+
+```json
+{
+  "exported_at": "2026-10-06T14:42:56.599Z",
+  "account": {
+    "code": "EDJUSR00008",
+    "role_code": 1003,
+    "name": "Aarav Sharma",
+    "phone": "0000200001",
+    "email": "aarav.sharma@example.com",
+    "status": "active",
+    "email_verified": true,
+    "phone_verified": false,
+    "last_login": "2026-10-06T14:42:55.000Z",
+    "created_at": "2026-08-07T14:42:45.000Z"
+  },
+  "role_info": {
+    "code": 1003,
+    "role_type": "Job Seeker",
+    "role_key": "job_seeker"
+  },
+  "profile": {
+    "user_code": "EDJUSR00008",
+    "job_category_code": "EDJCAT00001",
+    "job_category_name": "Primary Teacher",
+    "gender": "male",
+    "date_of_birth": "1996-03-14",
+    "qualification": "B.Ed, B.A. English",
+    "experience_years": 3,
+    "skills": "Phonics, Classroom management, Storytelling",
+    "expected_salary": 24000,
+    "state_code": "EDJSTA00026",
+    "state_name": "Uttar Pradesh",
+    "city_code": "EDJCTY00150",
+    "city_name": "Noida",
+    "about": "Primary Teacher with 3 years of experience.",
+    "has_resume": true,
+    "resume_name": "Aarav-Sharma-CV.pdf",
+    "resume_uploaded_at": "2026-10-06T14:42:56.000Z",
+    "is_discoverable": true,
+    "share_contact": false,
+    "modified_at": "2026-10-06T14:42:56.000Z",
+    "additional_job_categories": [
+      {
+        "code": "EDJCAT00002",
+        "name": "Secondary Teacher"
+      }
+    ],
+    "job_category_codes": [
+      "EDJCAT00001",
+      "EDJCAT00002"
+    ]
+  },
+  "applications": [
+    {
+      "code": "EDJAPP00046",
+      "job_code": "EDJJOB00026",
+      "job_title": "Primary Teacher - EVS",
+      "job_type": "full_time",
+      "job_status": "closed",
+      "job_category_name": "Primary Teacher",
+      "institution_name": "Greenfield Public School",
+      "institution_type_code": "EDJITY00001",
+      "institution_type_name": "School",
+      "institution_logo_url": null,
+      "institution_verified": false,
+      "state_code": "EDJSTA00026",
+      "state_name": "Uttar Pradesh",
+      "city_code": "EDJCTY00150",
+      "city_name": "Noida",
+      "application_status": "hired",
+      "applied_at": "2026-10-06T14:42:52.000Z",
+      "status_changed_at": "2026-10-06T14:42:52.000Z",
+      "interview_at": null,
+      "interview_mode": null,
+      "interview_location": null,
+      "interview_notes": null,
+      "can_withdraw": false
+    }
+  ],
+  "saved_jobs": [
+    {
+      "code": "EDJJOB00028",
+      "title": "Substitute Teacher",
+      "institution_name": "Greenfield Public School",
+      "saved_at": "2026-10-06T14:42:56.000Z"
+    }
+  ]
+}
+```
+
+- `DELETE /api/v1/users/me` with `{ "password" }` (provider or seeker): erases personal data and ends all sessions; the email and phone can register again. Ask for confirmation first; it can't be undone. Errors: `400 invalid_password`.
+
+### 4.8 Other changes in existing responses
+
+| Response | New fields |
+|---|---|
+| `user_info` (login, `/me`, profiles) | `email_verified`, `phone_verified` |
+| Provider job rows (`/job/jobs`) | `taken_down`, `takedown_reason` (an admin takedown closes the job; reopening it answers `400 job_taken_down`) |
+| Seeker application rows | `institution_logo_url`, `institution_verified`, `interview_at`, `interview_mode`, `interview_location`, `interview_notes` |
+| Provider application rows | `has_resume`, `interview_at`, `interview_mode` |
+| Menus | seeker: **Saved Jobs** `/saved-jobs/list`; provider: **Find Candidates** `/candidates/list` |
+
+Admin-only endpoints (`/api/v1/admin/...`) and `GET /api/v1/health` are not used by the frontend; see Swagger.

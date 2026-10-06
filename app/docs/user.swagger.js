@@ -15,6 +15,8 @@
  *         phone: { type: string, example: "0000100001" }
  *         email: { type: string, example: "hr.greenfield@example.com" }
  *         status: { type: string, enum: [active, inactive] }
+ *         email_verified: { type: boolean, example: false }
+ *         phone_verified: { type: boolean, example: false }
  *         last_login: { type: string, format: date-time, nullable: true }
  *         created_at: { type: string, format: date-time }
  *     UserRoleInfo:
@@ -190,4 +192,258 @@
  *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       403: { description: Not an admin, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       404: { description: No such account (user_not_found), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/users/password:
+ *   patch:
+ *     summary: Change own password
+ *     description: Every other session ends; the response carries a new token for this one.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [current_password, new_password]
+ *             properties:
+ *               current_password: { type: string }
+ *               new_password: { type: string, minLength: 8, description: "Upper-case, lower-case and a digit" }
+ *           example: { current_password: "Secret123", new_password: "N3wSecret!" }
+ *     responses:
+ *       200:
+ *         description: Changed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         token: { type: string, description: "Replaces the token used for this request" }
+ *       400: { description: "Validation error, invalid_current_password, password_unchanged", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/users/logout:
+ *   post:
+ *     summary: Log out everywhere
+ *     description: Ends every session of the user (all devices); their tokens answer 401 token_revoked from now on.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Logged out, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/users/forgot-password:
+ *   post:
+ *     summary: Request a password reset code (public, no token needed)
+ *     description: |
+ *       Public, no token needed. Rate limited per IP. Sends a 6-digit code (valid 10 minutes) to the
+ *       email, or by SMS to the phone, given as `username`. The answer is the same whether or not the
+ *       account exists. A new code can be requested after 60 seconds.
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username]
+ *             properties:
+ *               username: { type: string, description: "Email or 10-digit phone" }
+ *           example: { username: "aarav.sharma@example.com" }
+ *     responses:
+ *       200:
+ *         description: Code sent if the account exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         channel: { type: string, enum: [email, phone] }
+ *       400: { description: Validation error, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       429: { description: Too many code requests from this IP (too_many_requests), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/users/reset-password:
+ *   post:
+ *     summary: Set a new password with the reset code (public, no token needed)
+ *     description: Public, no token needed. Rate limited per IP. Also clears a failed-login lockout and ends every existing session. A code allows 5 wrong tries.
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, otp, new_password]
+ *             properties:
+ *               username: { type: string }
+ *               otp: { type: string, pattern: '^[0-9]{6}$' }
+ *               new_password: { type: string, minLength: 8 }
+ *           example: { username: "aarav.sharma@example.com", otp: "482913", new_password: "N3wSecret!" }
+ *     responses:
+ *       200: { description: Password reset, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+ *       400: { description: "Validation error, otp_invalid (wrong, expired or unknown account), otp_attempts_exceeded", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       429: { description: Too many code requests from this IP (too_many_requests), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/users/verify/send:
+ *   post:
+ *     summary: Send a code to verify own email or phone
+ *     description: Rate limited per IP; one code per channel every 60 seconds. Changing the email or phone later clears its verification.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [channel]
+ *             properties:
+ *               channel: { type: string, enum: [email, phone] }
+ *           example: { channel: "email" }
+ *     responses:
+ *       200:
+ *         description: Code sent
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         channel: { type: string, enum: [email, phone] }
+ *                         destination: { type: string, example: "aarav.sharma@example.com" }
+ *       400: { description: "Validation error, already_verified", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       429: { description: "otp_cooldown (wait before asking again) or too_many_requests", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       503: { description: The code could not be delivered (otp_delivery_failed), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/users/verify/confirm:
+ *   post:
+ *     summary: Confirm own email or phone with the code
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [channel, otp]
+ *             properties:
+ *               channel: { type: string, enum: [email, phone] }
+ *               otp: { type: string, pattern: '^[0-9]{6}$' }
+ *           example: { channel: "email", otp: "482913" }
+ *     responses:
+ *       200:
+ *         description: Verified
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         user_info: { $ref: '#/components/schemas/UserInfo' }
+ *       400: { description: "Validation error, otp_invalid, otp_attempts_exceeded", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/users/me/export:
+ *   get:
+ *     summary: Export own data
+ *     description: Everything stored about the user as one JSON document. Seekers get their applications and saved jobs, providers their jobs.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The export
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         exported_at: { type: string, format: date-time }
+ *                         account: { $ref: '#/components/schemas/UserInfo' }
+ *                         role_info: { $ref: '#/components/schemas/UserRoleInfo' }
+ *                         profile: { $ref: '#/components/schemas/UserProfileRes' }
+ *                         applications: { type: array, items: { $ref: '#/components/schemas/ApplicationSeekerRow' }, description: "Seekers only" }
+ *                         saved_jobs: { type: array, items: { type: object }, description: "Seekers only" }
+ *                         jobs: { type: array, items: { $ref: '#/components/schemas/JobProviderJob' }, description: "Providers only" }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/users/me:
+ *   delete:
+ *     summary: Delete own account (job_provider or job_seeker)
+ *     description: |
+ *       Needs the password. Personal data is erased and the account anonymised, so its email and
+ *       phone can register again. A seeker's live applications are withdrawn (hires stay, without
+ *       contact details) and the resume is deleted; a provider's open jobs are closed and the logo is
+ *       deleted. Every session ends. This can't be undone.
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password]
+ *             properties:
+ *               password: { type: string }
+ *           example: { password: "Secret123" }
+ *     responses:
+ *       200: { description: Deleted, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+ *       400: { description: "Validation error, invalid_password", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Admin accounts can't be deleted this way, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  */

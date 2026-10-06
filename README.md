@@ -30,6 +30,11 @@ cp .env.example .env      # then fill it in (see below)
 | `SEED_DEMO_DATA` | `true` to load the demo providers, seekers, jobs and applications |
 | `SEED_DEMO_PASSWORD` | Password of every demo account (required when `SEED_DEMO_DATA=true`) |
 | `PROD_API_URL` | Production base URL shown as a server in Swagger |
+| `UPLOAD_DIR` | Where resumes and logos are stored (default `./uploads`). In production use an absolute path **outside** the deploy checkout: the workflow's checkout deletes untracked files |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` | Outgoing email for password reset and verification codes |
+| `SMS_WEBHOOK_URL`, `SMS_WEBHOOK_TOKEN` | Outgoing SMS: the API POSTs `{ to, message }` here (with `Authorization: Bearer <token>` if set). Point it at your SMS gateway or a small adapter in front of one |
+
+Without SMTP / SMS settings, a non-production server prints each message to its log (`[OUTBOX:EMAIL]`, `[OUTBOX:SMS]`) so codes can be tested; a production server refuses to send (forgot-password still answers the same, verification answers `503 otp_delivery_failed`).
 
 Other settings (port, cron switch, frontend URL, proxy trust, rate limits) live in `app/config/dev.json`, `uat.json` and `prod.json`.
 
@@ -103,13 +108,17 @@ edujobs.postman_collection.json
 
 | Area | Base path | Router | Notes |
 |---|---|---|---|
-| user | `/api/v1/users` | `user.router.js` | `POST /login` and `POST /register` are public and rate limited; `GET /me` restores a session (user, profile, role, menu); `PATCH /unlock` (admin) clears a failed-login lockout |
+| user | `/api/v1/users` | `user.router.js` | `POST /login`, `/register`, `/forgot-password`, `/reset-password` are public and rate limited. `GET /me` restores a session (user, profile, role, menu); `PATCH /password`; `POST /logout` (all sessions); `POST /verify/send` + `/verify/confirm` (email/phone OTP); `GET /me/export`; `DELETE /me`; `PATCH /unlock` (admin) clears a failed-login lockout |
 | rbac | `/api/v1/rbac` | `rbac.router.js` | `GET /menu-access/:rolecode`: menu tree of the caller's own role |
 | master | `/api/v1/master` | `master.router.js` | `job-categories`, `institution-types`, `states`, `cities`: public `GET` list/detail; admin-only `POST`, `PATCH`, `DELETE` |
-| profile | `/api/v1/profile` | `profile.router.js` | `GET`/`PATCH /provider/me` (job provider), `GET`/`PATCH /seeker/me` (job seeker) |
-| job | `/api/v1/job` | `job.router.js` | Provider: `/jobs` CRUD on own jobs. Seeker: `/openings` (open jobs in the seeker's own category) |
-| application | `/api/v1/application` | `application.router.js` | Provider: `/applications` list, detail, status change. Seeker: `/my-applications` list, detail, apply, withdraw |
+| profile | `/api/v1/profile` | `profile.router.js` | `GET`/`PATCH /provider/me`, `PUT`/`DELETE /provider/me/logo` (job provider); `GET`/`PATCH /seeker/me`, `GET`/`PUT`/`DELETE /seeker/me/resume` (job seeker). Uploads are `multipart/form-data`, field `file` |
+| job | `/api/v1/job` | `job.router.js` | Provider: `/jobs` CRUD on own jobs. Seeker: `/openings` (open jobs in the seeker's categories), `/saved-jobs` |
+| application | `/api/v1/application` | `application.router.js` | Provider: `/applications` list, detail, status change (with interview details), `/export` (CSV), `/bulk-status`, `/:applicationid/notes`, `/:applicationid/resume`. Seeker: `/my-applications` list, detail, apply (with cover note), withdraw |
 | dashboard | `/api/v1/dashboard` | `dashboard.router.js` | `GET /provider`, `GET /seeker` |
+| public | `/api/v1/public` | `public.router.js` | No token: `/jobs` and `/jobs/:jobid` (open, unexpired jobs), `/logos/:filename` |
+| talent | `/api/v1/talent` | `talent.router.js` | Provider candidate search: `/candidates`, `/candidates/:usercode`, `/candidates/:usercode/resume` |
+| admin | `/api/v1/admin` | `admin.router.js` | Admin only: `/users` list/detail, `/users/:usercode/status`, `/providers/:usercode/verification`, `/jobs` list, `/jobs/:jobid/moderation`, `/stats` |
+| health | `/api/v1/health` | `health.router.js` | No token: API and database status (200 / 503) |
 
 Swagger (`/api-docs`) documents every route with request examples and every status it can return.
 
@@ -152,7 +161,11 @@ All input is validated by Joi schemas in `app/utils/validation.schemas.js`. Unkn
 
 - `POST /api/v1/users/login` with `{ username, password }` (`username` is the email or the phone). Send the returned token in the `x-access-token` header. Tokens last 24 hours.
 - Five wrong passwords lock the account (`failed_login_attempts`). The admin unlocks it with `PATCH /api/v1/users/unlock` and `{ "username": "<email, phone or user code>" }`.
-- `POST /users/login` and `POST /users/register` are rate limited per IP (`RATE_LIMIT` in the env config). Counters live in the `rate_limit_hits` table, so every app process (pm2 instances, several servers) shares one window. Over the limit: `429` with `resData.error = "too_many_requests"`. If that table can't be reached the request is let through.
+- Tokens carry a version (`users.token_version`). Logout, a password change or reset, account deletion and admin deactivation bump it, which ends every session of that user (`401 token_revoked`).
+- **Password reset:** `POST /users/forgot-password` sends a 6-digit code to the email or, by SMS, the phone given as `username` (same answer whether or not the account exists); `POST /users/reset-password` sets the new password, clears a lockout and ends all sessions.
+- **Verification:** `POST /users/verify/send` and `/verify/confirm` with `channel: email|phone`; `user_info.email_verified` / `phone_verified` show the result. Changing the email or phone clears its flag. Verification is not required for anything yet.
+- **Codes (OTP):** 6 digits, valid 10 minutes, 5 wrong tries, a new one per purpose every 60 seconds; only an HMAC is stored (`user_otps`).
+- `POST /users/login`, `/register`, `/forgot-password`, `/reset-password` and `/verify/send` are rate limited per IP (`RATE_LIMIT` in the env config). Counters live in the `rate_limit_hits` table, so every app process (pm2 instances, several servers) shares one window. Over the limit: `429` with `resData.error = "too_many_requests"`. If that table can't be reached the request is let through.
 - Roles (`roles.code`, with the key the frontend uses):
 
   | code | role_type | role_key |
@@ -163,16 +176,21 @@ All input is validated by Joi schemas in `app/utils/validation.schemas.js`. Unkn
 
   Every `role_info` in a response carries `role_key`.
 - Role-specific routes use `restrictTo(ROLE_CODES.X)`. Write routes also use `checkApiModuleAccess`, which looks the route pattern up in `api_module_mapping` and checks the role's flags in `role_module_access_mapping` (`POST`→write, `PATCH`/`PUT`→update, `DELETE`→delete, `full_access` grants all). An API with no mapping row is allowed for any logged-in user.
-- Sidebar menus come from `menus` + `role_module_access_mapping.menu_access`. The admin has no menu: it manages master data and unlocks accounts through Swagger/Postman.
+- Sidebar menus come from `menus` + `role_module_access_mapping.menu_access`. The admin has no menu: it manages master data, users, verification and moderation through Swagger/Postman.
 
 ### Business rules (summary)
 
 - A provider only reads and changes their own jobs and the applications on them; anything else is a `404`.
-- A seeker sees only open jobs in the category stored in their profile; the client can't choose the category.
+- A seeker sees only open jobs in their profile's categories: the primary `job_category_code` plus up to 2 `additional_job_category_codes`. The client can narrow to one of them but never choose another.
 - Applying needs a profile with `job_category_code`, `qualification` and `experience_years`; the job must be open, not past `last_date` and in the seeker's category; one live application per job and seeker (enforced under a row lock on the job). A withdrawn application can be made again.
 - A seeker can withdraw only while the status is `applied`.
 - Hiring past `vacancies` fails with `job_vacancies_filled`. The hire that fills the last vacancy closes the job and returns `job_auto_closed: true`. Leaving `hired` lowers `hired_count` without reopening the job. A job with `hired_count >= vacancies` is always closed.
 - A job with live applications can't be deleted (`job_in_use`); close it instead.
+- Moving an application to `interview` needs `interview_at` (future) and `interview_mode`, plus `interview_location` for in-person and video; sending `interview` again reschedules. `provider_notes` are never shown to the seeker.
+- Files: resumes are PDF/DOC/DOCX up to 5 MB, logos PNG/JPEG/WebP up to 1 MB, both checked by content. A resume is downloadable by its owner, by the provider of a job the seeker applied to, and in candidate search only as below. Logos are public.
+- Candidate search lists only seekers with `is_discoverable`; their phone, email and resume are shown only if they also set `share_contact` **and** the provider's institution is verified by the admin.
+- Admin takedown closes a job, hides it everywhere and stops its provider from reopening it until it is restored.
+- Deleting an account (password required) anonymises the user so the email and phone can register again: a seeker's live applications are withdrawn except hires, saved jobs and the resume removed; a provider's open jobs closed and the logo removed.
 
 ---
 
@@ -192,7 +210,7 @@ All input is validated by Joi schemas in `app/utils/validation.schemas.js`. Unkn
 - Business codes come from `app/helper/code_generator.helper.js`, always inside the insert's transaction: it locks the prefix's `code_sequences` row, so concurrent inserts for the same prefix wait in turn instead of colliding. It also looks at the table's last code, so rows seeded with fixed codes are never handed out again.
 - `applications` deliberately has no unique index on (`job_code`, `seeker_user_code`): a withdrawn (soft-deleted) application must not block a new one.
 - Money is `DECIMAL(12,2)` (monthly INR) and is returned as a number. Dates without time (`last_date`, `date_of_birth`) are `DATEONLY` strings `YYYY-MM-DD`.
-- Tables: `roles`, `users`, `modules`, `menus`, `role_module_access_mapping`, `api_module_mapping`, `job_categories`, `institution_types`, `states`, `cities`, `provider_profiles`, `seeker_profiles`, `jobs`, `applications`, plus two system tables: `code_sequences` (business-code counters) and `rate_limit_hits` (shared rate-limit counters).
+- Tables: `roles`, `users`, `user_otps`, `modules`, `menus`, `role_module_access_mapping`, `api_module_mapping`, `job_categories`, `institution_types`, `states`, `cities`, `provider_profiles`, `seeker_profiles`, `seeker_additional_categories`, `jobs`, `saved_jobs`, `applications`, plus two system tables: `code_sequences` (business-code counters) and `rate_limit_hits` (shared rate-limit counters).
 
 ### Migrations
 
@@ -202,6 +220,10 @@ New tables come from `sync`. A change to an existing table needs a migration in 
 npm run db:migrate
 npm run db:migrate:status
 ```
+
+The migrations skip columns that already exist and tables that don't exist yet, so `db:migrate` is safe on a fresh database (where `sync` already created every column) and on a first deploy (where the tables don't exist until the app starts). The deploy workflow runs it on every push.
+
+**Upgrading an existing database to this release:** run `npm run db:migrate`, then `npx sequelize-cli db:seed:all` once. The RBAC seeder adds the new modules, menus and API mappings and grants permissions that `rbac.json` added to existing rows.
 
 ### Seeders
 
@@ -241,17 +263,19 @@ Follow BLUEPRINT.md §7 and its "New module checklist":
 
 ## Postman
 
-Import `edujobs.postman_collection.json`. It has one folder per area and one request per route. Collection auth sends `x-access-token: {{token}}`; public requests (login, register, master reads) use no auth. Running **Users › Login** stores the token in `{{token}}`. Set `{{baseUrl}}` for other environments.
+Import `edujobs.postman_collection.json`. It has one folder per area and one request per route. Collection auth sends `x-access-token: {{token}}`; public requests (login, register, forgot/reset password, master reads, public jobs, health) use no auth. Upload requests use form-data: pick the file for the `file` field. Running **Users › Login** stores the token in `{{token}}`. Set `{{baseUrl}}` for other environments.
 
 ---
 
 ## Deployment
 
-A push to `main` runs `.github/workflows/deploy.yml` on a self-hosted runner: `npm ci`, writes `.env` from the `DEV_ENV` repository secret (store the whole `.env` there), and (re)starts the app with pm2 as `edujobs_api`. Set `NODE_ENV=production` in that `.env` to use `prod.json`, where `TRUST_PROXY` is on so rate limiting sees the real client IP behind a proxy.
+A push to `main` runs `.github/workflows/deploy.yml` on a self-hosted runner: `npm ci`, writes `.env` from the `DEV_ENV` repository secret (store the whole `.env` there), runs `db:migrate`, and (re)starts the app with pm2 as `edujobs_api`. Set `UPLOAD_DIR` to a directory outside the checkout so uploaded files survive deploys. Set `NODE_ENV=production` in that `.env` to use `prod.json`, where `TRUST_PROXY` is on so rate limiting sees the real client IP behind a proxy.
 
 ---
 
 ## Known issues
 
 - **Master names stay reserved after delete:** names are unique across deleted rows too, so a deleted category/state name can't be reused; mark rows inactive instead of deleting them.
+- **Verification is informational:** nothing is blocked for an unverified email or phone yet; enforce it (e.g. before applying or posting) once email/SMS delivery is configured.
+- **Uploads live on the server's disk:** with several servers, put `UPLOAD_DIR` on shared storage (or move files to object storage).
 - **Expired jobs between cron runs:** if `ENABLE_CRON` is off, open jobs past `last_date` stay `open`. They are flagged `is_expired: true` in lists and can't be applied to (`job_expired`).

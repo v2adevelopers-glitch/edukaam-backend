@@ -32,6 +32,8 @@
  *         description: { type: string, nullable: true }
  *         job_status: { type: string, enum: [open, closed] }
  *         is_expired: { type: boolean, description: "last_date is before today", example: false }
+ *         taken_down: { type: boolean, description: "Taken down by the admin: closed and can't be reopened", example: false }
+ *         takedown_reason: { type: string, nullable: true }
  *         created_at: { type: string, format: date-time }
  *         modified_at: { type: string, format: date-time }
  *     JobOpening:
@@ -46,6 +48,8 @@
  *         institution_name: { type: string, example: "Riverside International School" }
  *         institution_type_code: { type: string, example: "EDJITY00001" }
  *         institution_type_name: { type: string, example: "School" }
+ *         institution_logo_url: { type: string, nullable: true, description: "Public URL relative to the API host" }
+ *         institution_verified: { type: boolean, example: false }
  *         state_code: { type: string, example: "EDJSTA00011" }
  *         state_name: { type: string, example: "Karnataka" }
  *         city_code: { type: string, example: "EDJCTY00064" }
@@ -58,9 +62,10 @@
  *         last_date: { type: string, format: date }
  *         description: { type: string, nullable: true }
  *         job_status: { type: string, enum: [open] }
- *         already_applied: { type: boolean, description: "This seeker has a live application", example: false }
  *         is_expired: { type: boolean, example: false }
  *         posted_at: { type: string, format: date-time }
+ *         already_applied: { type: boolean, description: "Seeker endpoints only: this seeker has a live application", example: false }
+ *         is_saved: { type: boolean, description: "Seeker endpoints only: in this seeker's saved jobs", example: false }
  *     JobOpeningDetail:
  *       allOf:
  *         - $ref: '#/components/schemas/JobOpening'
@@ -215,7 +220,7 @@
  *                 - type: object
  *                   properties:
  *                     resData: { $ref: '#/components/schemas/JobProviderJob' }
- *       400: { description: "Validation error, invalid_*_code, city_state_mismatch, invalid_salary_range, invalid_last_date, job_category_locked, vacancies_below_hired, job_vacancies_filled (reopen), job_expired (reopen)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       400: { description: "Validation error, invalid_*_code, city_state_mismatch, invalid_salary_range, invalid_last_date, job_category_locked, vacancies_below_hired, job_vacancies_filled (reopen), job_expired (reopen), job_taken_down (reopen)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       403: { description: Not a job provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       404: { description: Not found or another provider's job (job_not_found), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
@@ -237,8 +242,8 @@
  * @swagger
  * /api/v1/job/openings:
  *   get:
- *     summary: Open jobs in the seeker's category (job_seeker only)
- *     description: The category comes from the seeker's profile and can't be chosen by the client.
+ *     summary: Open jobs in the seeker's categories (job_seeker only)
+ *     description: The categories come from the seeker's profile (primary + additional). `job_category_code` narrows to one of them; any other is refused.
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []
@@ -246,6 +251,7 @@
  *       - { in: query, name: page, schema: { type: integer, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 100 } }
  *       - { in: query, name: search, schema: { type: string }, description: Partial match on title or institution name }
+ *       - { in: query, name: job_category_code, schema: { type: string }, description: One of the seeker's own categories }
  *       - { in: query, name: institution_type_code, schema: { type: string } }
  *       - { in: query, name: job_type, schema: { type: string, enum: [full_time, part_time, contract, visiting] } }
  *       - { in: query, name: state_code, schema: { type: string } }
@@ -265,7 +271,7 @@
  *                       properties:
  *                         data: { type: array, items: { $ref: '#/components/schemas/JobOpening' } }
  *                         pagination: { $ref: '#/components/schemas/PaginationResponse' }
- *       400: { description: "Invalid query parameters, or no job category in the profile (profile_incomplete)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       400: { description: "Invalid query parameters, no job category in the profile (profile_incomplete), or a category not in the profile (category_not_in_profile)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  */
@@ -296,4 +302,94 @@
  *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       404: { description: "Not found, closed, or in another category (job_not_found)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/job/saved-jobs:
+ *   get:
+ *     summary: Own saved jobs (job_seeker only)
+ *     description: Most recently saved first. Closed jobs stay (see job_status); deleted and taken-down ones drop out.
+ *     tags: [Jobs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - { in: query, name: page, schema: { type: integer, default: 1 } }
+ *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 100 } }
+ *     responses:
+ *       200:
+ *         description: resData holds data + pagination
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         data:
+ *                           type: array
+ *                           items:
+ *                             allOf:
+ *                               - $ref: '#/components/schemas/JobOpening'
+ *                               - type: object
+ *                                 properties:
+ *                                   saved_at: { type: string, format: date-time }
+ *                         pagination: { $ref: '#/components/schemas/PaginationResponse' }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *   post:
+ *     summary: Save an opening (job_seeker only)
+ *     description: Only an open job in the seeker's categories. Saving an already saved job succeeds again.
+ *     tags: [Jobs]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [job_code]
+ *             properties:
+ *               job_code: { type: string }
+ *           example: { job_code: "EDJJOB00021" }
+ *     responses:
+ *       200:
+ *         description: Saved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         job_code: { type: string }
+ *                         is_saved: { type: boolean, example: true }
+ *       400: { description: "Validation error, profile_incomplete", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       404: { description: "Not an opening this seeker can see (job_not_found)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/job/saved-jobs/{jobid}:
+ *   parameters:
+ *     - { in: path, name: jobid, required: true, schema: { type: string, example: "EDJJOB00021" }, description: The job's code }
+ *   delete:
+ *     summary: Remove a job from saved jobs (job_seeker only)
+ *     tags: [Jobs]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Removed, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       404: { description: Not in saved jobs (saved_job_not_found), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  */

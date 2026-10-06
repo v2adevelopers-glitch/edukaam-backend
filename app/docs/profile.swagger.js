@@ -24,6 +24,8 @@
  *         city_code: { type: string, nullable: true, example: "EDJCTY00150" }
  *         city_name: { type: string, nullable: true, example: "Noida" }
  *         pincode: { type: string, nullable: true, example: "201309" }
+ *         logo_url: { type: string, nullable: true, example: "/api/v1/public/logos/3f1c2b7e-9a4d-4c55-8f0e-2d7b1a6c9e10.png", description: "Relative to the API host; public" }
+ *         institution_verified: { type: boolean, description: "Set by the admin", example: false }
  *         modified_at: { type: string, format: date-time }
  *     ProfileSeeker:
  *       type: object
@@ -42,6 +44,16 @@
  *         city_code: { type: string, nullable: true, example: "EDJCTY00150" }
  *         city_name: { type: string, nullable: true, example: "Noida" }
  *         about: { type: string, nullable: true }
+ *         has_resume: { type: boolean, example: true }
+ *         resume_name: { type: string, nullable: true, example: "Aarav-Sharma-CV.pdf" }
+ *         resume_uploaded_at: { type: string, format: date-time, nullable: true }
+ *         is_discoverable: { type: boolean, description: "Listed in provider candidate search", example: false }
+ *         share_contact: { type: boolean, description: "Verified institutions may see phone, email and resume in candidate search", example: false }
+ *         additional_job_categories:
+ *           type: array
+ *           items: { type: object, properties: { code: { type: string }, name: { type: string } } }
+ *           example: [{ code: "EDJCAT00002", name: "Secondary Teacher" }]
+ *         job_category_codes: { type: array, items: { type: string }, description: "Primary first; openings come from all of them", example: ["EDJCAT00001", "EDJCAT00002"] }
  *         modified_at: { type: string, format: date-time }
  *     ProfileProviderResponse:
  *       type: object
@@ -169,7 +181,10 @@
  *               name: { type: string }
  *               phone: { type: string, pattern: '^[0-9]{10}$' }
  *               email: { type: string, format: email }
- *               job_category_code: { type: string }
+ *               job_category_code: { type: string, description: "Primary category" }
+ *               additional_job_category_codes: { type: array, maxItems: 2, items: { type: string }, description: "Replaces the whole set; [] removes them; the primary is dropped from it" }
+ *               is_discoverable: { type: boolean }
+ *               share_contact: { type: boolean }
  *               gender: { type: string, enum: [male, female, other], nullable: true }
  *               date_of_birth: { type: string, format: date, nullable: true }
  *               qualification: { type: string, nullable: true }
@@ -195,4 +210,113 @@
  *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  *       404: { description: Profile not found (profile_not_found), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/profile/provider/me/logo:
+ *   put:
+ *     summary: Upload or replace the institution logo (job_provider only)
+ *     description: multipart/form-data with the file in the field `file`. PNG, JPEG or WebP (checked by content), at most 1 MB. The logo is public at `profile_res.logo_url`.
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: Uploaded; resData.profile_res has the new logo_url
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         profile_res: { $ref: '#/components/schemas/ProfileProvider' }
+ *       400: { description: "file_missing, invalid_upload, invalid_file_type, file_too_large", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not a job provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *   delete:
+ *     summary: Delete the institution logo (job_provider only)
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Deleted, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not a job provider, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       404: { description: No logo (logo_not_found), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ */
+
+/**
+ * @swagger
+ * /api/v1/profile/seeker/me/resume:
+ *   get:
+ *     summary: Download own resume (job_seeker only)
+ *     description: The file itself (Content-Disposition attachment), not the JSON envelope. Errors use the envelope.
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The file
+ *         content:
+ *           application/octet-stream:
+ *             schema: { type: string, format: binary }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       404: { description: No resume (resume_not_found), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *   put:
+ *     summary: Upload or replace own resume (job_seeker only)
+ *     description: multipart/form-data with the file in the field `file`. PDF, DOC or DOCX (checked by content), at most 5 MB.
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file: { type: string, format: binary }
+ *     responses:
+ *       200:
+ *         description: Uploaded
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/SuccessResponse'
+ *                 - type: object
+ *                   properties:
+ *                     resData:
+ *                       type: object
+ *                       properties:
+ *                         profile_res: { $ref: '#/components/schemas/ProfileSeeker' }
+ *       400: { description: "file_missing, invalid_upload, invalid_file_type, file_too_large", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *   delete:
+ *     summary: Delete own resume (job_seeker only)
+ *     tags: [Profile]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: Deleted, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+ *       401: { description: Missing or invalid token, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       403: { description: Not a job seeker, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+ *       404: { description: No resume (resume_not_found), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
  */

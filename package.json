@@ -23,7 +23,7 @@
     "multer": "^2.4.0",
     "mysql2": "^3.14.1",
     "node-cron": "^4.6.0",
-    "nodemailer": "^7.0.13",
+    "nodemailer": "^10.0.15",
     "sequelize": "^6.37.7",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
