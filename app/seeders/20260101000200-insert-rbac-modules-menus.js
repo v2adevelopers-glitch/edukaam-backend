@@ -42,8 +42,19 @@ module.exports = {
     await insertMenus(menus.filter(m => m.parent));
 
     // role access
-    const existingAccess = new Set((await select(`SELECT role_code, module_id FROM role_module_access_mapping`))
-      .map(r => `${r.role_code}:${r.module_id}`));
+    const accessRowsInDb = await select(`SELECT id, role_code, module_id, ${ACCESS_FLAGS.join(', ')} FROM role_module_access_mapping`);
+    const existingAccess = new Set(accessRowsInDb.map(r => `${r.role_code}:${r.module_id}`));
+
+    // a permission added to rbac.json later is granted on existing rows too (never revoked here)
+    for (const a of role_access) {
+      const row = accessRowsInDb.find(r => r.role_code === a.role_code && r.module_id === moduleIds.get(a.module));
+      if (!row) continue;
+      const grants = ACCESS_FLAGS.filter(flag => a[flag] === true && !row[flag]);
+      if (grants.length) {
+        await queryInterface.bulkUpdate('role_module_access_mapping',
+          Object.fromEntries(grants.map(flag => [flag, true])), { id: row.id });
+      }
+    }
     const accessRows = role_access
       .filter(a => !existingAccess.has(`${a.role_code}:${moduleIds.get(a.module)}`))
       .map(a => {

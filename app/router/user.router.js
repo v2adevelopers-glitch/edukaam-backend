@@ -1,7 +1,7 @@
 const express = require('express');
 const userCtrl = require('../controller/user.controller');
 const authMiddleware = require('../middlewares/auth.middleware');
-const { loginLimiter, registerLimiter } = require('../middlewares/rate_limit.middleware');
+const { loginLimiter, registerLimiter, otpLimiter } = require('../middlewares/rate_limit.middleware');
 const { validateBody } = require('../middlewares/validation.middleware');
 const { userSchemas } = require('../utils/validation.schemas');
 const { ROLE_CODES } = require('../constants/role.constant');
@@ -21,6 +21,33 @@ router.route("/register")
 
 router.route("/me")
     .get(authMiddleware.protect, userCtrl.getMe);
+
+// =====================
+// PASSWORD & SESSION ROUTES
+// =====================
+
+router.route("/password")
+    .patch(authMiddleware.protect, authMiddleware.checkApiModuleAccess, validateBody(userSchemas.changePassword), userCtrl.changePassword);
+
+router.route("/logout")
+    .post(authMiddleware.protect, authMiddleware.checkApiModuleAccess, userCtrl.logoutUser);
+
+// Public: the user can't log in
+router.route("/forgot-password")
+    .post(otpLimiter, validateBody(userSchemas.forgotPassword), userCtrl.forgotPassword);
+
+router.route("/reset-password")
+    .post(otpLimiter, validateBody(userSchemas.resetPassword), userCtrl.resetPassword);
+
+// =====================
+// VERIFICATION ROUTES
+// =====================
+
+router.route("/verify/send")
+    .post(authMiddleware.protect, otpLimiter, authMiddleware.checkApiModuleAccess, validateBody(userSchemas.sendVerification), userCtrl.sendVerification);
+
+router.route("/verify/confirm")
+    .post(authMiddleware.protect, authMiddleware.checkApiModuleAccess, validateBody(userSchemas.confirmVerification), userCtrl.confirmVerification);
 
 // =====================
 // ACCOUNT ADMINISTRATION ROUTES

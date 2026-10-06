@@ -37,6 +37,9 @@ db.seekerProfile = require('./profile/seeker_profile.model')(sequelize, DataType
 
 db.job = require('./job/job.model')(sequelize, DataTypes);
 db.application = require('./application/application.model')(sequelize, DataTypes);
+db.savedJob = require('./job/saved_job.model')(sequelize, DataTypes);
+db.seekerAdditionalCategory = require('./profile/seeker_additional_category.model')(sequelize, DataTypes);
+db.userOtp = require('./user/user_otp.model')(sequelize, DataTypes);
 
 db.codeSequence = require('./system/code_sequence.model')(sequelize, DataTypes);
 db.rateLimitHit = require('./system/rate_limit_hit.model')(sequelize, DataTypes);
@@ -104,6 +107,22 @@ db.application.belongsTo(db.job, { foreignKey: 'job_code', targetKey: 'code', as
 db.job.hasMany(db.application, { foreignKey: 'job_code', sourceKey: 'code', as: 'applications', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
 db.application.belongsTo(db.user, { foreignKey: 'seeker_user_code', targetKey: 'code', as: 'seeker', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
 db.user.hasMany(db.application, { foreignKey: 'seeker_user_code', sourceKey: 'code', as: 'applications', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+
+// OTPs belong to their user
+db.userOtp.belongsTo(db.user, { foreignKey: 'user_code', targetKey: 'code', as: 'user', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+db.user.hasMany(db.userOtp, { foreignKey: 'user_code', sourceKey: 'code', as: 'otps', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+
+// Saved jobs: owned by the seeker, point at the job
+db.savedJob.belongsTo(db.user, { foreignKey: 'seeker_user_code', targetKey: 'code', as: 'seeker', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+db.user.hasMany(db.savedJob, { foreignKey: 'seeker_user_code', sourceKey: 'code', as: 'savedJobs', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+db.savedJob.belongsTo(db.job, { foreignKey: 'job_code', targetKey: 'code', as: 'job', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+db.job.hasMany(db.savedJob, { foreignKey: 'job_code', sourceKey: 'code', as: 'savedBy', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+
+// Seeker's additional categories
+db.seekerAdditionalCategory.belongsTo(db.user, { foreignKey: 'seeker_user_code', targetKey: 'code', as: 'seeker', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+db.user.hasMany(db.seekerAdditionalCategory, { foreignKey: 'seeker_user_code', sourceKey: 'code', as: 'additionalCategories', onDelete: 'CASCADE', onUpdate: 'CASCADE' });
+db.seekerAdditionalCategory.belongsTo(db.jobCategory, { foreignKey: 'job_category_code', targetKey: 'code', as: 'jobCategory', onDelete: 'NO ACTION', onUpdate: 'CASCADE' });
+db.jobCategory.hasMany(db.seekerAdditionalCategory, { foreignKey: 'job_category_code', sourceKey: 'code', as: 'seekerAdditionalCategories', onDelete: 'NO ACTION', onUpdate: 'CASCADE' });
 
 // Creates missing tables only; it never changes existing ones (use migrations for that).
 // NEVER use force: true: it drops and recreates every table in every process that loads this file.

@@ -28,6 +28,10 @@ const strongPassword = Joi.string().min(8).max(72).pattern(/^(?=.*[a-z])(?=.*[A-
     'string.pattern.base': '"password" must contain an upper-case letter, a lower-case letter and a digit'
 });
 
+const otpCode = Joi.string().trim().pattern(/^[0-9]{6}$/).messages({
+    'string.pattern.base': '"otp" must be the 6-digit code'
+});
+
 // Optional free text a user may clear: null or '' (stored as null)
 const optionalText = (max) => Joi.string().trim().max(max).allow(null, '');
 
@@ -39,6 +43,31 @@ exports.userSchemas = {
     login: Joi.object({
         username: Joi.string().trim().lowercase().required(),   // email or phone
         password: Joi.string().required()
+    }),
+
+    changePassword: Joi.object({
+        current_password: Joi.string().required(),
+        new_password: strongPassword.required()
+    }),
+
+    // username is the email or the phone the code goes to
+    forgotPassword: Joi.object({
+        username: Joi.alternatives().try(Joi.string().trim().lowercase().email(), phone10).required()
+    }),
+
+    resetPassword: Joi.object({
+        username: Joi.alternatives().try(Joi.string().trim().lowercase().email(), phone10).required(),
+        otp: otpCode.required(),
+        new_password: strongPassword.required()
+    }),
+
+    sendVerification: Joi.object({
+        channel: Joi.string().valid('email', 'phone').required()
+    }),
+
+    confirmVerification: Joi.object({
+        channel: Joi.string().valid('email', 'phone').required(),
+        otp: otpCode.required()
     }),
 
     // admin: clear the failed-login lockout of an account

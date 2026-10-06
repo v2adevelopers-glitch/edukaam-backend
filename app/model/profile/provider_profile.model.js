@@ -14,6 +14,10 @@ module.exports = (sequelize, DataTypes) => {
         state_code: { type: DataTypes.STRING(20), allowNull: true },               // FK: states.code
         city_code: { type: DataTypes.STRING(20), allowNull: true },                // FK: cities.code
         pincode: { type: DataTypes.STRING(6), allowNull: true },
+        logo_file: { type: DataTypes.STRING(255), allowNull: true },      // file name under UPLOAD_DIR/logos
+        // set by the admin after checking the institution is real
+        verified_at: { type: DataTypes.DATE, allowNull: true },
+        verified_by: { type: DataTypes.INTEGER, allowNull: true },
         status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
         created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
         created_by: { type: DataTypes.INTEGER, allowNull: true },

@@ -24,6 +24,11 @@ const protect = async (req, res, next) => {
             throw new CustomError('user_not_active', 401, "User not found or not active");
         }
 
+        // logout, a password change or deactivation bumps token_version and ends older tokens
+        if ((decoded.tv || 0) !== user.token_version) {
+            throw new CustomError('token_revoked', 401, "Your session has ended, please log in again");
+        }
+
         req.user = user.toJSON();
         next();
     } catch (err) {

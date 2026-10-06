@@ -13,6 +13,13 @@ module.exports = (sequelize, DataTypes) => {
         state_code: { type: DataTypes.STRING(20), allowNull: true },               // FK: states.code
         city_code: { type: DataTypes.STRING(20), allowNull: true },                // FK: cities.code
         about: { type: DataTypes.TEXT, allowNull: true },
+        // stored file name under UPLOAD_DIR/resumes (never sent to clients) and the uploaded name
+        resume_file: { type: DataTypes.STRING(255), allowNull: true },
+        resume_name: { type: DataTypes.STRING(255), allowNull: true },
+        resume_uploaded_at: { type: DataTypes.DATE, allowNull: true },
+        // opt-ins for provider candidate search
+        is_discoverable: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+        share_contact: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
         status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
         created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
         created_by: { type: DataTypes.INTEGER, allowNull: true },
@@ -28,6 +35,7 @@ module.exports = (sequelize, DataTypes) => {
             { fields: ['job_category_code'], name: 'idx_seeker_profile_job_category_code' },
             { fields: ['state_code'], name: 'idx_seeker_profile_state_code' },
             { fields: ['city_code'], name: 'idx_seeker_profile_city_code' },
+            { fields: ['is_discoverable'], name: 'idx_seeker_profile_is_discoverable' },
             { fields: ['status'], name: 'idx_seeker_profile_status' }
         ]
     });

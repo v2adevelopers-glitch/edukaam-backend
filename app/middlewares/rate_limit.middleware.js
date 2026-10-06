@@ -35,7 +35,7 @@ class MysqlStore {
     }
 }
 
-// Per-IP limits for the public auth endpoints
+// Per-IP limits for the public auth and code endpoints
 const limiter = (name, windowMinutes, max, message) => rateLimit({
     windowMs: windowMinutes * MINUTE_MS,
     limit: max,
@@ -48,11 +48,14 @@ const limiter = (name, windowMinutes, max, message) => rateLimit({
     handler: (req, res) => errorResponse(res, name, new CustomError('too_many_requests', 429, message))
 });
 
-const { LOGIN_WINDOW_MINUTES, LOGIN_MAX, REGISTER_WINDOW_MINUTES, REGISTER_MAX } = currentEnv.RATE_LIMIT;
+const { LOGIN_WINDOW_MINUTES, LOGIN_MAX, REGISTER_WINDOW_MINUTES, REGISTER_MAX, OTP_WINDOW_MINUTES, OTP_MAX } = currentEnv.RATE_LIMIT;
 
 module.exports = {
     loginLimiter: limiter('login', LOGIN_WINDOW_MINUTES, LOGIN_MAX,
         "Too many login attempts from this IP, please try again later"),
     registerLimiter: limiter('register', REGISTER_WINDOW_MINUTES, REGISTER_MAX,
-        "Too many registrations from this IP, please try again later")
+        "Too many registrations from this IP, please try again later"),
+    // forgot/reset password and verification codes (each code sent costs an email or SMS)
+    otpLimiter: limiter('otp', OTP_WINDOW_MINUTES, OTP_MAX,
+        "Too many code requests from this IP, please try again later")
 };

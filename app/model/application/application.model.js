@@ -11,6 +11,12 @@ module.exports = (sequelize, DataTypes) => {
         },
         applied_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
         status_changed_at: { type: DataTypes.DATE, allowNull: true },
+        cover_note: { type: DataTypes.TEXT, allowNull: true },             // from the seeker, shown to the provider
+        provider_notes: { type: DataTypes.TEXT, allowNull: true },         // private to the provider
+        interview_at: { type: DataTypes.DATE, allowNull: true },
+        interview_mode: { type: DataTypes.ENUM('in_person', 'phone', 'video'), allowNull: true },
+        interview_location: { type: DataTypes.STRING(500), allowNull: true },   // address or meeting link
+        interview_notes: { type: DataTypes.TEXT, allowNull: true },        // shown to the seeker
         status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
         created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
         created_by: { type: DataTypes.INTEGER, allowNull: true },

@@ -10,6 +10,10 @@ module.exports = (sequelize, DataTypes) => {
         password: { type: DataTypes.STRING(255), allowNull: true },
         failed_login_attempts: { type: DataTypes.INTEGER, defaultValue: 0 },
         last_login: { type: DataTypes.DATE, allowNull: true },
+        // bumped on logout, password change and deactivation; tokens carrying an older value are refused
+        token_version: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+        email_verified_at: { type: DataTypes.DATE, allowNull: true },
+        phone_verified_at: { type: DataTypes.DATE, allowNull: true },
         status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
         created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
         created_by: { type: DataTypes.INTEGER, allowNull: true },

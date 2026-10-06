@@ -18,6 +18,10 @@ module.exports = (sequelize, DataTypes) => {
         description: { type: DataTypes.TEXT, allowNull: true },
         // hiring state; the audit status column below stays active/inactive
         job_status: { type: DataTypes.ENUM('open', 'closed'), allowNull: false, defaultValue: 'open' },
+        // admin moderation: a taken-down job is closed and can't be reopened by the provider
+        taken_down_at: { type: DataTypes.DATE, allowNull: true },
+        taken_down_by: { type: DataTypes.INTEGER, allowNull: true },
+        takedown_reason: { type: DataTypes.STRING(500), allowNull: true },
         status: { type: DataTypes.ENUM('active', 'inactive'), defaultValue: 'active' },
         created_at: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
         created_by: { type: DataTypes.INTEGER, allowNull: true },
@@ -37,6 +41,7 @@ module.exports = (sequelize, DataTypes) => {
             { fields: ['state_code'], name: 'idx_job_state_code' },
             { fields: ['city_code'], name: 'idx_job_city_code' },
             { fields: ['last_date'], name: 'idx_job_last_date' },
+            { fields: ['taken_down_at'], name: 'idx_job_taken_down_at' },
             { fields: ['status'], name: 'idx_job_status' }
         ]
     });

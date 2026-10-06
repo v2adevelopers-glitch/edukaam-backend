@@ -17,6 +17,8 @@ exports.formatUserInfo = (user) => {
         phone: user.phone,
         email: user.email,
         status: user.status,
+        email_verified: !!user.email_verified_at,
+        phone_verified: !!user.phone_verified_at,
         last_login: user.last_login,
         created_at: user.created_at
     };
@@ -142,13 +144,71 @@ exports.createUser = async (payload, meta = {}, transaction = null) => {
     }
 };
 
-// name / phone / email only; update skips undefined values, so only the fields sent change
+// name / phone / email only; update skips undefined values, so only the fields sent change.
+// A changed email or phone is no longer verified.
 exports.updateAccount = async (code, payload, meta = {}, transaction = null) => {
     try {
+        const current = await db.user.findOne({ where: { code, deleted: false }, attributes: ['email', 'phone'], transaction });
+        if (!current) return false;
+        const emailChanged = payload.email !== undefined && payload.email !== current.email;
+        const phoneChanged = payload.phone !== undefined && payload.phone !== current.phone;
+
         const [updated] = await db.user.update({
             name: payload.name,
             phone: payload.phone,
             email: payload.email,
+            email_verified_at: emailChanged ? null : undefined,
+            phone_verified_at: phoneChanged ? null : undefined,
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { code, deleted: false }, transaction });
+
+        return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// New password: also clears the lockout and ends every existing session (token_version + 1)
+exports.setPassword = async (code, passwordHash, meta = {}, transaction = null) => {
+    try {
+        const [updated] = await db.user.update({
+            password: passwordHash,
+            failed_login_attempts: 0,
+            token_version: db.sequelize.literal('token_version + 1'),
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { code, deleted: false }, transaction });
+
+        return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// Ends every session of the user (their current tokens stop working)
+exports.revokeSessions = async (code, meta = {}, transaction = null) => {
+    try {
+        const [updated] = await db.user.update({
+            token_version: db.sequelize.literal('token_version + 1'),
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { code }, transaction });
+
+        return !!updated;
+    } catch (err) {
+        throw err;
+    }
+};
+
+// channel: 'email' | 'phone'
+exports.markVerified = async (code, channel, meta = {}, transaction = null) => {
+    try {
+        const [updated] = await db.user.update({
+            [channel === 'email' ? 'email_verified_at' : 'phone_verified_at']: new Date(),
             modified_at: new Date(),
             modified_by: meta.userId || null,
             ip_address: meta.ip || null
