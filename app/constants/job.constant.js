@@ -29,5 +29,10 @@ exports.PROVIDER_SETTABLE_STATUSES = [
 
 exports.GENDERS = ['male', 'female', 'other'];
 
+exports.INTERVIEW_MODES = ['in_person', 'phone', 'video'];
+
+// Rows in one applicants CSV export
+exports.APPLICATION_EXPORT_MAX_ROWS = 5000;
+
 // Seeker profile fields a provider needs to judge an application
 exports.SEEKER_FIELDS_REQUIRED_TO_APPLY = ['job_category_code', 'qualification', 'experience_years'];

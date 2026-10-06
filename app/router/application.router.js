@@ -17,9 +17,19 @@ const seeker = restrictTo(ROLE_CODES.JOB_SEEKER);
 router.route("/applications")
     .get(protect, provider, validateQuery(applicationSchemas.getApplications), applicationCtrl.getAllApplications);
 
+// literal paths before /applications/:applicationid
+router.route("/applications/export")
+    .get(protect, provider, validateQuery(applicationSchemas.getApplications), applicationCtrl.exportApplications);
+
+router.route("/applications/bulk-status")
+    .patch(protect, provider, checkApiModuleAccess, validateBody(applicationSchemas.bulkUpdateApplicationStatus), applicationCtrl.bulkUpdateApplicationStatus);
+
 router.route("/applications/:applicationid")
     .get(protect, provider, validateParams(applicationSchemas.applicationid), applicationCtrl.getSingleApplication)
     .patch(protect, provider, checkApiModuleAccess, validateParams(applicationSchemas.applicationid), validateBody(applicationSchemas.updateApplicationStatus), applicationCtrl.updateApplicationStatus);
+
+router.route("/applications/:applicationid/notes")
+    .patch(protect, provider, checkApiModuleAccess, validateParams(applicationSchemas.applicationid), validateBody(applicationSchemas.updateProviderNotes), applicationCtrl.updateProviderNotes);
 
 router.route("/applications/:applicationid/resume")
     .get(protect, provider, validateParams(applicationSchemas.applicationid), applicationCtrl.downloadApplicantResume);

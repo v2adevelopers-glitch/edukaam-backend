@@ -1,7 +1,7 @@
 const Joi = require('joi');
 const { REGISTRABLE_ROLE_KEYS } = require('../constants/role.constant');
 const { STORED_FILE_PATTERN } = require('../constants/file.constant');
-const { JOB_TYPES, JOB_STATUS, APPLICATION_STATUSES, PROVIDER_SETTABLE_STATUSES, GENDERS } = require('../constants/job.constant');
+const { JOB_TYPES, JOB_STATUS, APPLICATION_STATUSES, PROVIDER_SETTABLE_STATUSES, GENDERS, INTERVIEW_MODES } = require('../constants/job.constant');
 
 // Common validation patterns
 const commonPatterns = {
@@ -260,6 +260,21 @@ exports.jobSchemas = {
     })
 };
 
+// Required when moving an application to 'interview' (a location for in-person and video
+// interviews: an address or a meeting link); ignored for every other status
+const whenInterview = (schema) => Joi.when('application_status', { is: 'interview', then: schema, otherwise: Joi.any().strip() });
+const interviewFields = {
+    interview_at: whenInterview(Joi.date().iso().greater('now').required()
+        .messages({ 'date.greater': '"interview_at" must be in the future' })),
+    interview_mode: whenInterview(Joi.string().valid(...INTERVIEW_MODES).required()),
+    interview_location: whenInterview(Joi.when('interview_mode', {
+        is: Joi.valid('in_person', 'video'),
+        then: Joi.string().trim().max(500).required(),
+        otherwise: optionalText(500).optional()
+    })),
+    interview_notes: whenInterview(optionalText(2000).optional())
+};
+
 // ─── Applications ─────────────────────────────────────────────────────────
 
 exports.applicationSchemas = {
@@ -277,7 +292,18 @@ exports.applicationSchemas = {
     }),
 
     updateApplicationStatus: Joi.object({
-        application_status: Joi.string().valid(...PROVIDER_SETTABLE_STATUSES).required()
+        application_status: Joi.string().valid(...PROVIDER_SETTABLE_STATUSES).required(),
+        ...interviewFields
+    }),
+
+    bulkUpdateApplicationStatus: Joi.object({
+        application_codes: Joi.array().items(businessCode.required()).min(1).max(100).unique().required(),
+        application_status: Joi.string().valid(...PROVIDER_SETTABLE_STATUSES).required(),
+        ...interviewFields
+    }),
+
+    updateProviderNotes: Joi.object({
+        provider_notes: optionalText(5000).required()
     }),
 
     getMyApplications: Joi.object({
@@ -288,7 +314,8 @@ exports.applicationSchemas = {
     }),
 
     createApplication: Joi.object({
-        job_code: businessCode.required()
+        job_code: businessCode.required(),
+        cover_note: optionalText(2000).optional()
     })
 };
 

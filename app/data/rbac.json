@@ -405,6 +405,18 @@
       "api_endpoint": "/api/v1/profile/seeker/me/resume",
       "api_method": "DELETE",
       "api_slug": "delete-resume"
+    },
+    {
+      "module": "applications",
+      "api_endpoint": "/api/v1/application/applications/bulk-status",
+      "api_method": "PATCH",
+      "api_slug": "bulk-update-application-status"
+    },
+    {
+      "module": "applications",
+      "api_endpoint": "/api/v1/application/applications/:applicationid/notes",
+      "api_method": "PATCH",
+      "api_slug": "update-provider-notes"
     }
   ]
 }

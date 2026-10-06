@@ -4,7 +4,8 @@ const { errorResponse, successResponse, fileResponse } = require('../lib/respons
 const applicationService = require('../service/application.service');
 const profileService = require('../service/profile.service');
 const { getMeta } = require('../helper/common.helper');
-const { APPLICATION_STATUS, SEEKER_FIELDS_REQUIRED_TO_APPLY } = require('../constants/job.constant');
+const { toCsv } = require('../helper/csv.helper');
+const { APPLICATION_STATUS, SEEKER_FIELDS_REQUIRED_TO_APPLY, APPLICATION_EXPORT_MAX_ROWS } = require('../constants/job.constant');
 
 // Rules the application service checks inside its transaction, reported as { error: name }
 const SERVICE_ERRORS = {
@@ -22,30 +23,45 @@ const throwServiceError = (name) => {
     throw new CustomError(name, httpCode, message);
 };
 
+// interview fields from a validated status body (Joi strips them unless the status is 'interview')
+const interviewFrom = (body) => (body.application_status === APPLICATION_STATUS.INTERVIEW ? {
+    interview_at: body.interview_at,
+    interview_mode: body.interview_mode,
+    interview_location: body.interview_location,
+    interview_notes: body.interview_notes
+} : null);
+
 // ─── Provider applications ────────────────────────────────────────────────
+
+// List and export share the filters
+const providerApplicationsWhere = (query, providerCode) => {
+    const { search, job_code, application_status, job_category_code } = query;
+
+    // only applications on the provider's own jobs
+    let whereCondition = { deleted: false, '$job.provider_user_code$': providerCode, '$job.deleted$': false };
+
+    if (job_code) {
+        whereCondition.job_code = job_code;
+    }
+    if (application_status) {
+        whereCondition.application_status = application_status;
+    }
+    if (job_category_code) {
+        whereCondition['$job.job_category_code$'] = job_category_code;
+    }
+    if (search) {
+        whereCondition[Op.or] = [
+            { '$seeker.name$': { [Op.like]: `%${search}%` } },
+            { '$seeker.phone$': { [Op.like]: `%${search}%` } }
+        ];
+    }
+    return whereCondition;
+};
 
 const getAllApplications = async (req, res) => {
     try {
-        const { page, limit, search, job_code, application_status, job_category_code } = req.query;
-
-        // only applications on the provider's own jobs
-        let whereCondition = { deleted: false, '$job.provider_user_code$': req.user.code, '$job.deleted$': false };
-
-        if (job_code) {
-            whereCondition.job_code = job_code;
-        }
-        if (application_status) {
-            whereCondition.application_status = application_status;
-        }
-        if (job_category_code) {
-            whereCondition['$job.job_category_code$'] = job_category_code;
-        }
-        if (search) {
-            whereCondition[Op.or] = [
-                { '$seeker.name$': { [Op.like]: `%${search}%` } },
-                { '$seeker.phone$': { [Op.like]: `%${search}%` } }
-            ];
-        }
+        const { page, limit } = req.query;
+        const whereCondition = providerApplicationsWhere(req.query, req.user.code);
 
         const applications = await applicationService.getProviderApplications(whereCondition, page, limit);
         successResponse(res, "Applications fetched successfully", applications);
@@ -76,16 +92,91 @@ const updateApplicationStatus = async (req, res) => {
             req.params.applicationid,
             req.user.code,
             req.body.application_status,
-            getMeta(req)
+            getMeta(req),
+            interviewFrom(req.body)
         );
         if (result.error) throwServiceError(result.error);
 
-        const message = result.data.job_auto_closed
-            ? "Application status updated; every vacancy is now filled, so the job was closed"
-            : "Application status updated successfully";
+        let message = "Application status updated successfully";
+        if (result.data.job_auto_closed) message = "Application status updated; every vacancy is now filled, so the job was closed";
+        if (result.data.rescheduled) message = "Interview details updated";
         successResponse(res, message, result.data);
     } catch (err) {
         errorResponse(res, 'updateApplicationStatus', err);
+    }
+};
+
+// One status for many applications. Each one goes through the same transaction as a single
+// change, in order, so hiring stops at the vacancy limit; failures don't stop the rest.
+const bulkUpdateApplicationStatus = async (req, res) => {
+    try {
+        const { application_codes, application_status } = req.body;
+        const interview = interviewFrom(req.body);
+        const meta = getMeta(req);
+
+        const results = [];
+        for (const code of application_codes) {
+            const result = await applicationService.updateApplicationStatus(code, req.user.code, application_status, meta, interview);
+            if (result.error) {
+                const [, message] = SERVICE_ERRORS[result.error] || [400, result.error];
+                results.push({ code, success: false, error: result.error, message });
+            } else {
+                results.push({ code, success: true, job_code: result.data.job_code, job_auto_closed: result.data.job_auto_closed });
+            }
+        }
+
+        const updated = results.filter(r => r.success).length;
+        successResponse(res, `${updated} of ${results.length} applications updated`, {
+            updated,
+            failed: results.length - updated,
+            results
+        });
+    } catch (err) {
+        errorResponse(res, 'bulkUpdateApplicationStatus', err);
+    }
+};
+
+const updateProviderNotes = async (req, res) => {
+    try {
+        const result = await applicationService.updateProviderNotes(req.params.applicationid, req.user.code, req.body.provider_notes, getMeta(req));
+        if (!result) {
+            throw new CustomError('application_not_found', 404, "Application not found");
+        }
+        successResponse(res, "Notes saved", result);
+    } catch (err) {
+        errorResponse(res, 'updateProviderNotes', err);
+    }
+};
+
+const EXPORT_COLUMNS = [
+    { key: 'code', header: 'Application code' },
+    { key: 'applied_at', header: 'Applied at' },
+    { key: 'application_status', header: 'Status' },
+    { key: 'job_code', header: 'Job code' },
+    { key: 'job_title', header: 'Job title' },
+    { key: 'job_category_name', header: 'Category' },
+    { key: 'applicant_code', header: 'Applicant code' },
+    { key: 'applicant_name', header: 'Applicant name' },
+    { key: 'applicant_phone', header: 'Phone' },
+    { key: 'applicant_email', header: 'Email' },
+    { key: 'qualification', header: 'Qualification' },
+    { key: 'experience_years', header: 'Experience (years)' },
+    { key: 'interview_at', header: 'Interview at' },
+    { key: 'interview_mode', header: 'Interview mode' }
+];
+
+// CSV of the provider's applicants, with the list's filters (no pagination, capped)
+const exportApplications = async (req, res) => {
+    try {
+        const whereCondition = providerApplicationsWhere(req.query, req.user.code);
+        const rows = await applicationService.getProviderApplicationsForExport(whereCondition, APPLICATION_EXPORT_MAX_ROWS);
+
+        const day = new Date().toISOString().slice(0, 10);
+        res.set('Content-Type', 'text/csv; charset=utf-8');
+        res.set('Content-Disposition', `attachment; filename="applications-${day}.csv"`);
+        res.status(200).send(toCsv(EXPORT_COLUMNS, rows));
+    } catch (err) {
+        errorResponse(res, 'exportApplications', err);
     }
 };
 
@@ -164,7 +255,8 @@ const applyToJob = async (req, res) => {
         const result = await applicationService.applyToJob(
             req.body.job_code,
             { code: req.user.code, job_category_code: profile.job_category_code },
-            getMeta(req)
+            getMeta(req),
+            req.body.cover_note
         );
         if (result.error) throwServiceError(result.error);
 
@@ -206,6 +298,9 @@ module.exports = {
     getAllApplications,
     getSingleApplication,
     updateApplicationStatus,
+    bulkUpdateApplicationStatus,
+    updateProviderNotes,
+    exportApplications,
     downloadApplicantResume,
     // Seeker applications
     getMyApplications,

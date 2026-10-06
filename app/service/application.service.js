@@ -1,6 +1,7 @@
 const db = require('../model');
 const jobService = require('./job.service');
 const codeGenerator = require('../helper/code_generator.helper');
+const { emptyToNull } = require('../helper/common.helper');
 const { APPLICATION_STATUS, JOB_STATUS } = require('../constants/job.constant');
 const { LOGO_URL_PREFIX } = require('../constants/file.constant');
 
@@ -16,7 +17,16 @@ const paginate = (count, rows, page, limit) => ({
     }
 });
 
-const APPLICATION_COLUMNS = ['code', 'job_code', 'seeker_user_code', 'application_status', 'applied_at', 'status_changed_at'];
+const APPLICATION_COLUMNS = ['code', 'job_code', 'seeker_user_code', 'application_status', 'applied_at', 'status_changed_at',
+    'cover_note', 'provider_notes', 'interview_at', 'interview_mode', 'interview_location', 'interview_notes'];
+
+// Interview details; provider_notes is never part of this (seekers must not see it)
+const interviewOf = (row) => ({
+    interview_at: row.interview_at,
+    interview_mode: row.interview_mode,
+    interview_location: row.interview_location,
+    interview_notes: row.interview_notes
+});
 
 // ─── Provider side ────────────────────────────────────────────────────────
 // The only place a seeker's phone and email leave the API: the provider who owns the job.
@@ -67,7 +77,9 @@ const formatProviderApplication = (row) => {
         has_resume: !!(profile && profile.resume_file),
         application_status: row.application_status,
         applied_at: row.applied_at,
-        status_changed_at: row.status_changed_at
+        status_changed_at: row.status_changed_at,
+        interview_at: row.interview_at,
+        interview_mode: row.interview_mode
     };
 };
 
@@ -83,6 +95,9 @@ const formatProviderApplicationDetail = (row) => {
         application_status: row.application_status,
         applied_at: row.applied_at,
         status_changed_at: row.status_changed_at,
+        cover_note: row.cover_note,
+        provider_notes: row.provider_notes,
+        ...interviewOf(row),
         applicant: {
             code: row.seeker.code,
             name: row.seeker.name,
@@ -141,7 +156,9 @@ exports.getProviderApplication = async (whereCondition) => {
 // Lock order is job, then application (the same as apply), so the two can't deadlock.
 // hired_count changes and the auto-close happen in the same transaction as the status change.
 // Returns { error } or { data }.
-exports.updateApplicationStatus = async (code, provider_user_code, application_status, meta = {}) => {
+// interview = { interview_at, interview_mode, interview_location, interview_notes } when the
+// new status is 'interview'. Sending 'interview' again for an interview application reschedules.
+exports.updateApplicationStatus = async (code, provider_user_code, application_status, meta = {}, interview = null) => {
     const t = await db.sequelize.transaction();
     const fail = async (error) => {
         await t.rollback();
@@ -159,7 +176,39 @@ exports.updateApplicationStatus = async (code, provider_user_code, application_s
         if (!application) return await fail('application_not_found');
 
         const previous = application.application_status;
-        if (previous === application_status) return await fail('application_status_unchanged');
+        const now = new Date();
+        const interviewColumns = application_status === APPLICATION_STATUS.INTERVIEW && interview ? {
+            interview_at: interview.interview_at,
+            interview_mode: interview.interview_mode,
+            interview_location: emptyToNull(interview.interview_location) || null,
+            interview_notes: emptyToNull(interview.interview_notes) || null
+        } : {};
+
+        if (previous === application_status) {
+            if (application_status !== APPLICATION_STATUS.INTERVIEW || !interview) return await fail('application_status_unchanged');
+            await db.application.update({
+                ...interviewColumns,
+                modified_at: now,
+                modified_by: meta.userId || null,
+                ip_address: meta.ip || null
+            }, { where: { id: application.id }, transaction: t });
+            await t.commit();
+            return {
+                data: {
+                    code,
+                    job_code: job.code,
+                    application_status,
+                    previous_status: previous,
+                    status_changed_at: application.status_changed_at,
+                    ...interviewColumns,
+                    rescheduled: true,
+                    job_status: job.job_status,
+                    vacancies: job.vacancies,
+                    hired_count: job.hired_count,
+                    job_auto_closed: false
+                }
+            };
+        }
 
         let hiredCount = job.hired_count;
         let jobStatus = job.job_status;
@@ -181,10 +230,10 @@ exports.updateApplicationStatus = async (code, provider_user_code, application_s
             await jobService.updateJobHiring(job.id, { hired_count: hiredCount, job_status: jobStatus }, meta, t);
         }
 
-        const now = new Date();
         await db.application.update({
             application_status,
             status_changed_at: now,
+            ...interviewColumns,
             modified_at: now,
             modified_by: meta.userId || null,
             ip_address: meta.ip || null
@@ -198,6 +247,8 @@ exports.updateApplicationStatus = async (code, provider_user_code, application_s
                 application_status,
                 previous_status: previous,
                 status_changed_at: now,
+                ...interviewColumns,
+                rescheduled: false,
                 job_status: jobStatus,
                 vacancies: job.vacancies,
                 hired_count: hiredCount,
@@ -206,6 +257,44 @@ exports.updateApplicationStatus = async (code, provider_user_code, application_s
         };
     } catch (err) {
         await t.rollback();
+        throw err;
+    }
+};
+
+// Private notes: only the provider who owns the job reads or writes them
+exports.updateProviderNotes = async (code, provider_user_code, provider_notes, meta = {}) => {
+    try {
+        const application = await db.application.findOne({
+            where: { code, deleted: false, '$job.provider_user_code$': provider_user_code },
+            attributes: ['id'],
+            include: [{ model: db.job, as: 'job', attributes: [], required: true }]
+        });
+        if (!application) return null;
+
+        await db.application.update({
+            provider_notes: emptyToNull(provider_notes) || null,
+            modified_at: new Date(),
+            modified_by: meta.userId || null,
+            ip_address: meta.ip || null
+        }, { where: { id: application.id } });
+        return { code, provider_notes: emptyToNull(provider_notes) || null };
+    } catch (err) {
+        throw err;
+    }
+};
+
+// Same rows as the provider list, without pagination (capped)
+exports.getProviderApplicationsForExport = async (whereCondition, maxRows) => {
+    try {
+        const rows = await db.application.findAll({
+            where: whereCondition,
+            attributes: APPLICATION_COLUMNS,
+            include: providerIncludes(false),
+            limit: maxRows,
+            order: [['applied_at', 'DESC'], ['id', 'DESC']]
+        });
+        return rows.map(formatProviderApplication);
+    } catch (err) {
         throw err;
     }
 };
@@ -259,6 +348,7 @@ const formatSeekerApplication = (row) => {
         application_status: row.application_status,
         applied_at: row.applied_at,
         status_changed_at: row.status_changed_at,
+        ...interviewOf(row),
         // a seeker may withdraw only until the provider acts on the application
         can_withdraw: row.application_status === APPLICATION_STATUS.APPLIED
     };
@@ -272,7 +362,8 @@ const formatSeekerApplicationDetail = (row) => ({
     min_qualification: row.job.min_qualification,
     min_experience_years: row.job.min_experience_years,
     last_date: row.job.last_date,
-    description: row.job.description
+    description: row.job.description,
+    cover_note: row.cover_note
 });
 
 exports.getSeekerApplications = async (whereCondition = { deleted: false }, page = 1, limit = 10) => {
@@ -306,7 +397,7 @@ exports.getSeekerApplication = async (whereCondition) => {
 // soft-deleted and must not block a new one), so the job row is locked: two concurrent
 // applies for the same job queue on it and the second one sees the first application.
 // Returns { error } or { data }.
-exports.applyToJob = async (job_code, seeker, meta = {}) => {
+exports.applyToJob = async (job_code, seeker, meta = {}, cover_note = null) => {
     const t = await db.sequelize.transaction();
     const fail = async (error) => {
         await t.rollback();
@@ -336,6 +427,7 @@ exports.applyToJob = async (job_code, seeker, meta = {}) => {
             application_status: APPLICATION_STATUS.APPLIED,
             applied_at: now,
             status_changed_at: null,
+            cover_note: emptyToNull(cover_note) || null,
             status: 'active',
             deleted: false,
             created_at: now,
