@@ -34,15 +34,19 @@ module.exports = (sequelize, DataTypes) => {
         tableName: "jobs",
         indexes: [
             { fields: ['code'], name: 'idx_job_code', unique: true },
-            { fields: ['provider_user_code'], name: 'idx_job_provider_user_code' },
-            { fields: ['job_category_code'], name: 'idx_job_job_category_code' },
-            { fields: ['job_status'], name: 'idx_job_job_status' },
+            // a provider's jobs, newest first
+            { fields: ['provider_user_code', 'deleted', 'created_at'], name: 'idx_job_provider_recent' },
+            // seeker openings: category + visible, read newest first without a sort
+            { fields: ['job_category_code', 'job_status', 'deleted', 'status', 'taken_down_at', 'created_at'], name: 'idx_job_category_open' },
+            // public list: visible jobs newest first. Must end at created_at: InnoDB appends id, so
+            // ORDER BY created_at, id is read from the index without a sort
+            { fields: ['job_status', 'deleted', 'status', 'taken_down_at', 'created_at'], name: 'idx_job_open_recent' },
             { fields: ['job_type'], name: 'idx_job_job_type' },
             { fields: ['state_code'], name: 'idx_job_state_code' },
             { fields: ['city_code'], name: 'idx_job_city_code' },
             { fields: ['last_date'], name: 'idx_job_last_date' },
-            { fields: ['taken_down_at'], name: 'idx_job_taken_down_at' },
-            { fields: ['status'], name: 'idx_job_status' }
+            // no single-column indexes on status / taken_down_at: nearly every row has the same value,
+            // and the optimizer intersected them instead of using the composites above
         ]
     });
 

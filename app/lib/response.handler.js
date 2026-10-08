@@ -2,7 +2,12 @@
 // clients can tell which handler failed without seeing the internal error
 exports.errorResponse = (res, handlerName, error) => {
     const statusCode = error && error.httpCode ? error.httpCode : 500;
-    console.log("=========Error==========", handlerName, statusCode, error);
+    // 4xx are expected (bad input, auth, rate limits): one line; only real failures get the stack
+    if (statusCode >= 500) {
+        console.log("=========Error==========", handlerName, statusCode, error);
+    } else {
+        console.log(`[${statusCode}] ${handlerName}: ${error && error.name} ${error && error.message}`);
+    }
 
     const message = statusCode === 500
         ? `${handlerName} [Internal Server Error]`

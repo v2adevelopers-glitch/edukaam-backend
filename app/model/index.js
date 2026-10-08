@@ -8,7 +8,15 @@ const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, proces
     // Session time zone: CURDATE() (job expiry, "today") must be the Indian date, not UTC
     timezone: process.env.DB_TIMEZONE || '+05:30',
     // DECIMAL columns (salaries) come back as numbers instead of strings
-    dialectOptions: { connectTimeout: 60000, decimalNumbers: true }
+    dialectOptions: { connectTimeout: 60000, decimalNumbers: true },
+    // Lists run their count and page queries in parallel, so the pool is larger than Sequelize's
+    // default of 5. Keep DB_POOL_MAX x app processes under MySQL's max_connections.
+    pool: {
+        max: Number(process.env.DB_POOL_MAX || 10),
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+    }
 });
 
 sequelize.authenticate()

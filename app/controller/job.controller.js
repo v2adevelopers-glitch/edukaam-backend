@@ -161,7 +161,11 @@ const getAllOpenings = async (req, res) => {
         let whereCondition = { ...visibleOpeningWhere(), job_category_code: { [Op.in]: categoryCodes } };
         applyOpeningFilters(whereCondition, req.query);
 
-        const openings = await jobService.getOpenings(whereCondition, req.user.code, page, limit);
+        // the total is the same for every seeker with these categories and filters
+        const { search, institution_type_code, job_type, state_code, city_code } = req.query;
+        const countCacheKey = 'openings_count:' + JSON.stringify([[...categoryCodes].sort(), search, institution_type_code, job_type, state_code, city_code]);
+
+        const openings = await jobService.getOpenings(whereCondition, req.user.code, page, limit, { countCacheKey });
         successResponse(res, "Openings fetched successfully", openings);
     } catch (err) {
         errorResponse(res, 'getAllOpenings', err);

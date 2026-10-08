@@ -243,7 +243,7 @@
  * /api/v1/job/openings:
  *   get:
  *     summary: Open jobs in the seeker's categories (job_seeker only)
- *     description: The categories come from the seeker's profile (primary + additional). `job_category_code` narrows to one of them; any other is refused.
+ *     description: The categories come from the seeker's profile (primary + additional). `job_category_code` narrows to one of them; any other is refused. `pagination.total` is shared per category set and filters and may lag new jobs by up to 60 seconds; rows are always current.
  *     tags: [Jobs]
  *     security:
  *       - bearerAuth: []

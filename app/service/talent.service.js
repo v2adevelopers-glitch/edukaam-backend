@@ -1,6 +1,7 @@
 const { literal } = require('sequelize');
 const db = require('../model');
 const { ROLE_CODES } = require('../constants/role.constant');
+const { findPage } = require('../helper/query.helper');
 
 const nameOnly = ['code', 'name'];
 
@@ -69,16 +70,12 @@ exports.inCategoryWhere = (code) => {
 
 exports.getCandidates = async (whereCondition, page = 1, limit = 10) => {
     try {
-        const offset = (page - 1) * limit;
-        const { count, rows } = await db.seekerProfile.findAndCountAll({
+        const { count, rows } = await findPage(db.seekerProfile, {
             where: whereCondition,
             attributes: CANDIDATE_COLUMNS,
             include: candidateIncludes,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            order: [['modified_at', 'DESC'], ['id', 'DESC']],
-            distinct: true
-        });
+            order: [['modified_at', 'DESC'], ['id', 'DESC']]
+        }, page, limit);
         const additional = await additionalByUser(rows.map(r => r.user_code));
         return {
             data: rows.map(r => formatCandidate(r, additional.get(r.user_code))),

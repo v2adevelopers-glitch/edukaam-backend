@@ -38,17 +38,21 @@ exports.getProviderDashboard = async (provider_user_code) => {
                     LIMIT 5`, replacements),
 
             // no phone/email here: contact details only appear in the applications list and detail
+            // the 5 newest ids first (narrow rows to sort), then the joins for those 5 only
             select(`SELECT a.code AS application_code, a.application_status, a.applied_at,
                            j.code AS job_code, j.title AS job_title,
                            u.code AS applicant_code, u.name AS applicant_name,
                            sp.qualification, sp.experience_years
-                    FROM applications a
-                    JOIN jobs j ON j.code = a.job_code AND j.deleted = false
+                    FROM (SELECT ra.id FROM applications ra
+                          JOIN jobs rj ON rj.code = ra.job_code AND rj.deleted = false
+                          WHERE rj.provider_user_code = :provider_user_code AND ra.deleted = false
+                          ORDER BY ra.applied_at DESC, ra.id DESC
+                          LIMIT 5) recent
+                    JOIN applications a ON a.id = recent.id
+                    JOIN jobs j ON j.code = a.job_code
                     JOIN users u ON u.code = a.seeker_user_code
                     LEFT JOIN seeker_profiles sp ON sp.user_code = u.code AND sp.deleted = false
-                    WHERE j.provider_user_code = :provider_user_code AND a.deleted = false
-                    ORDER BY a.applied_at DESC, a.id DESC
-                    LIMIT 5`, replacements)
+                    ORDER BY a.applied_at DESC, a.id DESC`, replacements)
         ]);
 
         const applications_by_status = zeroFillStatuses(statusRows);
@@ -76,7 +80,7 @@ exports.getSeekerDashboard = async (seeker_user_code, openingsWhere) => {
             select(`SELECT application_status, COUNT(*) AS count FROM applications
                     WHERE seeker_user_code = :seeker_user_code AND deleted = false
                     GROUP BY application_status`, { seeker_user_code }),
-            openingsWhere ? jobService.getOpenings(openingsWhere, seeker_user_code, 1, 5) : { data: [] }
+            openingsWhere ? jobService.getOpenings(openingsWhere, seeker_user_code, 1, 5, { count: false }) : { data: [] }
         ]);
 
         const applications_by_status = zeroFillStatuses(statusRows);

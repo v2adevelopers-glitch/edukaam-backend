@@ -37,13 +37,21 @@ const getAllUsers = async (req, res) => {
             whereCondition.role_code = ROLE_CODES.JOB_PROVIDER;
             whereCondition['$providerProfile.verified_at$'] = verified ? { [Op.ne]: null } : null;
         }
+        // an email, phone or user code is matched from its start, which the unique indexes serve;
+        // other text is a name search (a contains-match, so it scans users)
         if (search) {
-            whereCondition[Op.or] = [
-                { name: { [Op.like]: `%${search}%` } },
-                { email: { [Op.like]: `%${search}%` } },
-                { phone: { [Op.like]: `%${search}%` } },
-                { code: { [Op.like]: `%${search}%` } }
-            ];
+            if (search.includes('@')) {
+                whereCondition.email = { [Op.like]: `${search}%` };
+            } else if (/^[0-9]+$/.test(search)) {
+                whereCondition.phone = { [Op.like]: `${search}%` };
+            } else if (/^EDJUSR[0-9]*$/i.test(search)) {
+                whereCondition.code = { [Op.like]: `${search.toUpperCase()}%` };
+            } else {
+                whereCondition[Op.or] = [
+                    { name: { [Op.like]: `%${search}%` } },
+                    { email: { [Op.like]: `${search}%` } }
+                ];
+            }
         }
 
         const users = await adminService.getUsers(whereCondition, page, limit);

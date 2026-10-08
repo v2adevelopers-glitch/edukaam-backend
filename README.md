@@ -25,6 +25,7 @@ cp .env.example .env      # then fill it in (see below)
 | `NODE_ENV` | `development` (dev.json), `testing` (uat.json) or `production` (prod.json) |
 | `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT` | MySQL connection |
 | `DB_TIMEZONE` | Optional. DB session time zone, default `+05:30`, so `CURDATE()` is the Indian date |
+| `DB_POOL_MAX` | Optional. DB connections per app process, default 10. Keep `DB_POOL_MAX` × processes below MySQL's `max_connections` |
 | `JWT_SECRET_KEY` | Long random string used to sign tokens |
 | `SEED_ADMIN_PASSWORD` | Password of the admin user created by the seeder |
 | `SEED_DEMO_DATA` | `true` to load the demo providers, seekers, jobs and applications |
@@ -267,6 +268,39 @@ Import `edujobs.postman_collection.json`. It has one folder per area and one req
 
 ---
 
+## Performance
+
+Measured with 30,000 jobs, 300,000 applications and 62,000 users (median latency, same machine):
+
+| Endpoint | Before | After |
+|---|---|---|
+| `GET /public/jobs` | 404 ms (7 req/s at 20 concurrent) | 13 ms (178 req/s) |
+| `GET /job/openings` | 145 ms (15 req/s) | 17 ms (133 req/s) |
+| `GET /dashboard/seeker` | 154 ms | 15 ms |
+| `GET /dashboard/provider` | 28 ms | 15 ms |
+| `GET /admin/stats` | 617 ms | 4 ms (cached) |
+| `GET /admin/users?search=` | 172 ms | 70 ms (name search; email/phone/code searches use indexes) |
+
+What makes the difference, so later changes keep it:
+
+- **Composite indexes that match the lists** (`idx_job_category_open`, `idx_job_open_recent`, `idx_job_provider_recent`, `idx_application_job_live`, `idx_application_seeker_recent`, `idx_application_live_status`). A list index must end with the ORDER BY column (`created_at`); InnoDB appends `id`, so `ORDER BY created_at, id` is read from the index with no sort. Don't add single-column indexes on near-constant columns (`status`, `taken_down_at`): the optimizer intersected them and sorted every open job.
+- **Lists in two steps** (`findPage` in `helper/query.helper.js`, `listOpenings` in `job.service.js`): first the page's ids with only the joins that filter, and the count in parallel; then just those rows with every include. Use `findPage` for new paginated lists instead of `findAndCountAll`.
+- **Institution filters as `provider_user_code IN (SELECT … FROM provider_profiles …)`**, not a join, so the job index keeps driving the query.
+- **In-process caches** (`helper/cache.helper.js`), each process separately:
+
+  | Cached | For | Cleared |
+  |---|---|---|
+  | RBAC rules and menus | 60 s | by expiry (they change only through the seeder) |
+  | Master lists and code lookups | 5 min | immediately by master writes in the same process |
+  | Totals of the public job list and seeker openings (shared per filter set) | 60 s | by expiry; rows are always live |
+  | Admin stats | 60 s | by expiry |
+
+- **HTTP:** responses are gzip-compressed; public master reads send `Cache-Control: public, max-age=300` and public jobs `max-age=60`.
+- **Fewer round trips:** independent lookups run in parallel; apply reads the job's expiry with its row lock.
+- **Runtime:** connection pool of `DB_POOL_MAX` (default 10); expected 4xx errors are logged on one line (5xx keep the full error); `SIGTERM`/`SIGINT` stop new connections, finish running requests and close the pool (pm2 restarts).
+
+---
+
 ## Deployment
 
 A push to `main` runs `.github/workflows/deploy.yml` on a self-hosted runner: `npm ci`, writes `.env` from the `DEV_ENV` repository secret (store the whole `.env` there), runs `db:migrate`, and (re)starts the app with pm2 as `edujobs_api`. Set `UPLOAD_DIR` to a directory outside the checkout so uploaded files survive deploys. Set `NODE_ENV=production` in that `.env` to use `prod.json`, where `TRUST_PROXY` is on so rate limiting sees the real client IP behind a proxy.
@@ -278,4 +312,6 @@ A push to `main` runs `.github/workflows/deploy.yml` on a self-hosted runner: `n
 - **Master names stay reserved after delete:** names are unique across deleted rows too, so a deleted category/state name can't be reused; mark rows inactive instead of deleting them.
 - **Verification is informational:** nothing is blocked for an unverified email or phone yet; enforce it (e.g. before applying or posting) once email/SMS delivery is configured.
 - **Uploads live on the server's disk:** with several servers, put `UPLOAD_DIR` on shared storage (or move files to object storage).
+- **Cached totals and masters can lag:** pagination totals of the public list and seeker openings may lag new jobs by up to 60 s, and with several app processes a master-data change reaches the other processes within 5 minutes.
+- **Free-text admin user search scans users:** a name search is a contains-match; searches by email, phone or code use the indexes.
 - **Expired jobs between cron runs:** if `ENABLE_CRON` is off, open jobs past `last_date` stay `open`. They are flagged `is_expired: true` in lists and can't be applied to (`job_expired`).

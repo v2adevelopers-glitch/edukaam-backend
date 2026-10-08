@@ -20,7 +20,11 @@ const getPublicJobs = async (req, res) => {
         }
         applyOpeningFilters(whereCondition, req.query);
 
-        const jobs = await jobService.getPublicJobs(whereCondition, page, limit);
+        // same filters = same total; page and limit don't change it
+        const { search, job_category_code: category, institution_type_code, job_type, state_code, city_code } = req.query;
+        const countKey = 'public_jobs_count:' + JSON.stringify([search, category, institution_type_code, job_type, state_code, city_code]);
+
+        const jobs = await jobService.getPublicJobs(whereCondition, page, limit, countKey);
         successResponse(res, "Jobs fetched successfully", jobs);
     } catch (err) {
         errorResponse(res, 'getPublicJobs', err);

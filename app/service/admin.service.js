@@ -5,6 +5,8 @@ const profileService = require('./profile.service');
 const { getRoleKey, ROLE_CODES } = require('../constants/role.constant');
 const { MAX_FAILED_LOGINS } = require('../constants/account.constant');
 const { APPLICATION_STATUSES } = require('../constants/job.constant');
+const { findPage } = require('../helper/query.helper');
+const cache = require('../helper/cache.helper');
 
 const select = (sql, replacements = {}) => db.sequelize.query(sql, { replacements, type: QueryTypes.SELECT });
 
@@ -26,15 +28,11 @@ const formatAdminUser = (u) => ({
 
 exports.getUsers = async (whereCondition = { deleted: false }, page = 1, limit = 10) => {
     try {
-        const offset = (page - 1) * limit;
-        const { count, rows } = await db.user.findAndCountAll({
+        const { count, rows } = await findPage(db.user, {
             where: whereCondition,
             include: userIncludes,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            order: [['created_at', 'DESC'], ['id', 'DESC']],
-            distinct: true
-        });
+            order: [['created_at', 'DESC'], ['id', 'DESC']]
+        }, page, limit);
         return {
             data: rows.map(formatAdminUser),
             pagination: { total: count, page: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(count / limit) }
@@ -84,7 +82,12 @@ exports.getUserDetail = async (code) => {
 
 // ─── Stats ────────────────────────────────────────────────────────────────
 
-exports.getStats = async () => {
+// Counting means scanning users, jobs and applications, so the numbers are cached for a minute
+const STATS_TTL_MS = 60 * 1000;
+
+exports.getStats = () => cache.remember('admin:stats', STATS_TTL_MS, loadStats);
+
+const loadStats = async () => {
     try {
         const [[users], [jobs], applicationRows, [recentApplications]] = await Promise.all([
             select(`SELECT

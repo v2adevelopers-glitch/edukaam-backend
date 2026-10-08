@@ -14,6 +14,8 @@ This is the contract between the React frontend and this API: every endpoint the
 | Auth header | `x-access-token: <token>` (not `Authorization: Bearer`) |
 | Token lifetime | 24 hours; on `401` send the user to the login page |
 | Swagger | `http://localhost:8080/api-docs` |
+| Compression | Responses are gzip-compressed; browsers and `fetch` handle it automatically |
+| Caching | Master lists send `Cache-Control: public, max-age=300` and the public job list `max-age=60`. `pagination.total` of the public list and of Find Jobs can lag a new job by up to 60 seconds (the rows themselves are current) |
 | Record identifiers | Business codes (`EDJJOB00021`, `EDJAPP00005`, `EDJCAT00001`, …). Path params named `:jobid` / `:applicationid` take the **code** |
 | Money | Numbers, monthly INR (`salary_min`, `salary_max`, `expected_salary`) |
 | Dates | `last_date`, `date_of_birth`: `"YYYY-MM-DD"`. Timestamps (`applied_at`, `created_at`, …): ISO 8601 UTC |

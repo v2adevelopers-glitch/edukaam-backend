@@ -2,6 +2,7 @@ const express = require('express');
 const publicCtrl = require('../controller/public.controller');
 const { validateParams, validateQuery } = require('../middlewares/validation.middleware');
 const { publicSchemas } = require('../utils/validation.schemas');
+const { cachePublic } = require('../middlewares/cache.middleware');
 const router = express.Router();
 
 // Everything here is public: no token
@@ -11,10 +12,10 @@ const router = express.Router();
 // =====================
 
 router.route("/jobs")
-    .get(validateQuery(publicSchemas.getPublicJobs), publicCtrl.getPublicJobs);
+    .get(cachePublic(60), validateQuery(publicSchemas.getPublicJobs), publicCtrl.getPublicJobs);
 
 router.route("/jobs/:jobid")
-    .get(validateParams(publicSchemas.jobid), publicCtrl.getPublicJob);
+    .get(cachePublic(60), validateParams(publicSchemas.jobid), publicCtrl.getPublicJob);
 
 // =====================
 // LOGO ROUTES

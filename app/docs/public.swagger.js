@@ -10,7 +10,7 @@
  * /api/v1/public/jobs:
  *   get:
  *     summary: Public job list (public, no token needed)
- *     description: Open jobs whose last date hasn't passed, newest first. No contact details and no seeker-specific flags.
+ *     description: "Open jobs whose last date hasn't passed, newest first. No contact details and no seeker-specific flags. Sent with `Cache-Control: public, max-age=60`; `pagination.total` may lag new jobs by up to 60 seconds."
  *     tags: [Public]
  *     parameters:
  *       - { in: query, name: page, schema: { type: integer, default: 1 } }

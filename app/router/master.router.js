@@ -4,9 +4,12 @@ const authMiddleware = require('../middlewares/auth.middleware');
 const { validateBody, validateParams, validateQuery } = require('../middlewares/validation.middleware');
 const { masterSchemas } = require('../utils/validation.schemas');
 const { ROLE_CODES } = require('../constants/role.constant');
+const { cachePublic } = require('../middlewares/cache.middleware');
 const router = express.Router();
 
-// Reads are public (registration and search forms need them before login); writes are admin only
+// Reads are public (registration and search forms need them before login) and cacheable for
+// 5 minutes; writes are admin only
+const publicRead = cachePublic(300);
 const adminWrite = [authMiddleware.protect, authMiddleware.restrictTo(ROLE_CODES.ADMIN), authMiddleware.checkApiModuleAccess];
 
 // =====================
@@ -14,11 +17,11 @@ const adminWrite = [authMiddleware.protect, authMiddleware.restrictTo(ROLE_CODES
 // =====================
 
 router.route("/job-categories")
-    .get(validateQuery(masterSchemas.getMasters), masterCtrl.getAllJobCategories)
+    .get(publicRead, validateQuery(masterSchemas.getMasters), masterCtrl.getAllJobCategories)
     .post(...adminWrite, validateBody(masterSchemas.createJobCategory), masterCtrl.createJobCategory);
 
 router.route("/job-categories/:categorycode")
-    .get(validateParams(masterSchemas.categorycode), masterCtrl.getSingleJobCategory)
+    .get(publicRead, validateParams(masterSchemas.categorycode), masterCtrl.getSingleJobCategory)
     .patch(...adminWrite, validateParams(masterSchemas.categorycode), validateBody(masterSchemas.updateJobCategory), masterCtrl.updateJobCategory)
     .delete(...adminWrite, validateParams(masterSchemas.categorycode), masterCtrl.deleteJobCategory);
 
@@ -27,11 +30,11 @@ router.route("/job-categories/:categorycode")
 // =====================
 
 router.route("/institution-types")
-    .get(validateQuery(masterSchemas.getMasters), masterCtrl.getAllInstitutionTypes)
+    .get(publicRead, validateQuery(masterSchemas.getMasters), masterCtrl.getAllInstitutionTypes)
     .post(...adminWrite, validateBody(masterSchemas.createInstitutionType), masterCtrl.createInstitutionType);
 
 router.route("/institution-types/:typecode")
-    .get(validateParams(masterSchemas.typecode), masterCtrl.getSingleInstitutionType)
+    .get(publicRead, validateParams(masterSchemas.typecode), masterCtrl.getSingleInstitutionType)
     .patch(...adminWrite, validateParams(masterSchemas.typecode), validateBody(masterSchemas.updateInstitutionType), masterCtrl.updateInstitutionType)
     .delete(...adminWrite, validateParams(masterSchemas.typecode), masterCtrl.deleteInstitutionType);
 
@@ -40,11 +43,11 @@ router.route("/institution-types/:typecode")
 // =====================
 
 router.route("/states")
-    .get(validateQuery(masterSchemas.getMasters), masterCtrl.getAllStates)
+    .get(publicRead, validateQuery(masterSchemas.getMasters), masterCtrl.getAllStates)
     .post(...adminWrite, validateBody(masterSchemas.createState), masterCtrl.createState);
 
 router.route("/states/:statecode")
-    .get(validateParams(masterSchemas.statecode), masterCtrl.getSingleState)
+    .get(publicRead, validateParams(masterSchemas.statecode), masterCtrl.getSingleState)
     .patch(...adminWrite, validateParams(masterSchemas.statecode), validateBody(masterSchemas.updateState), masterCtrl.updateState)
     .delete(...adminWrite, validateParams(masterSchemas.statecode), masterCtrl.deleteState);
 
@@ -53,11 +56,11 @@ router.route("/states/:statecode")
 // =====================
 
 router.route("/cities")
-    .get(validateQuery(masterSchemas.getCities), masterCtrl.getAllCities)
+    .get(publicRead, validateQuery(masterSchemas.getCities), masterCtrl.getAllCities)
     .post(...adminWrite, validateBody(masterSchemas.createCity), masterCtrl.createCity);
 
 router.route("/cities/:citycode")
-    .get(validateParams(masterSchemas.citycode), masterCtrl.getSingleCity)
+    .get(publicRead, validateParams(masterSchemas.citycode), masterCtrl.getSingleCity)
     .patch(...adminWrite, validateParams(masterSchemas.citycode), validateBody(masterSchemas.updateCity), masterCtrl.updateCity)
     .delete(...adminWrite, validateParams(masterSchemas.citycode), masterCtrl.deleteCity);
 

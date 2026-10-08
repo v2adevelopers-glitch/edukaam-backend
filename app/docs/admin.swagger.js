@@ -37,7 +37,7 @@
  *     parameters:
  *       - { in: query, name: page, schema: { type: integer, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, default: 10, maximum: 100 } }
- *       - { in: query, name: search, schema: { type: string }, description: "Name, email, phone or code" }
+ *       - { in: query, name: search, schema: { type: string }, description: "Text with @ matches emails from the start, digits match phones from the start, EDJUSR… matches codes from the start; other text matches names (anywhere) or emails (from the start)" }
  *       - { in: query, name: role_key, schema: { type: string, enum: [admin, job_provider, job_seeker] } }
  *       - { in: query, name: status, schema: { type: string, enum: [active, inactive] } }
  *       - { in: query, name: locked, schema: { type: boolean }, description: Locked after 5 failed logins }
@@ -263,6 +263,7 @@
  * /api/v1/admin/stats:
  *   get:
  *     summary: Platform counts (admin)
+ *     description: Cached for 60 seconds.
  *     tags: [Admin]
  *     security:
  *       - bearerAuth: []

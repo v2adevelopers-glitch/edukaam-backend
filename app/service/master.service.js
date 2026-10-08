@@ -1,6 +1,12 @@
 const { Op } = require('sequelize');
 const db = require('../model');
 const codeGenerator = require('../helper/code_generator.helper');
+const cache = require('../helper/cache.helper');
+
+// Master data is read on every form and write but changes rarely. Writes in this process clear
+// the cache at once; other processes pick changes up within the TTL.
+const MASTER_TTL_MS = 5 * 60 * 1000;
+const MASTER_CACHE = 'master:';
 
 // The four master tables share one shape (code, name, audit block; cities add state_code),
 // so the queries below go through these private helpers. Every exported function is still
@@ -25,7 +31,11 @@ const formatCity = (row) => {
     };
 };
 
-const listMaster = async (model, whereCondition, page, limit, options = {}) => {
+const listMaster = (model, whereCondition, page, limit, options = {}) =>
+    cache.remember(`${MASTER_CACHE}${model.name}:list:${cache.keyOf([whereCondition, page, limit])}`, MASTER_TTL_MS,
+        () => loadMasterList(model, whereCondition, page, limit, options));
+
+const loadMasterList = async (model, whereCondition, page, limit, options) => {
     const offset = (page - 1) * limit;
     const { count, rows } = await model.findAndCountAll({
         where: whereCondition,
@@ -49,11 +59,16 @@ const listMaster = async (model, whereCondition, page, limit, options = {}) => {
     };
 };
 
-const findMasterByCode = (model, code, options = {}) => model.findOne({
-    where: { code, deleted: false, ...(options.activeOnly ? { status: 'active' } : {}) },
-    attributes: options.attributes || MASTER_ATTRIBUTES,
-    include: options.include || []
-});
+// Cached as the formatted row (or null)
+const findMasterByCode = (model, code, options = {}) =>
+    cache.remember(`${MASTER_CACHE}${model.name}:code:${code}:${!!options.activeOnly}`, MASTER_TTL_MS, async () => {
+        const row = await model.findOne({
+            where: { code, deleted: false, ...(options.activeOnly ? { status: 'active' } : {}) },
+            attributes: options.attributes || MASTER_ATTRIBUTES,
+            include: options.include || []
+        });
+        return (options.format || formatMaster)(row);
+    });
 
 // Includes soft-deleted rows: names are unique across all rows (DB unique index)
 const masterNameExists = async (model, whereCondition, excludeCode) => {
@@ -78,6 +93,7 @@ const createMaster = async (model, generateCode, columns, meta) => {
             ip_address: meta.ip || null
         }, { transaction: t });
         await t.commit();
+        cache.invalidate(MASTER_CACHE);
         return code;
     } catch (err) {
         await t.rollback();
@@ -92,6 +108,7 @@ const updateMaster = async (model, code, columns, meta) => {
         modified_by: meta.userId || null,
         ip_address: meta.ip || null
     }, { where: { code, deleted: false } });
+    cache.invalidate(MASTER_CACHE);
     return !!updated;
 };
 
@@ -103,6 +120,7 @@ const deleteMaster = async (model, code, meta) => {
         modified_by: meta.userId || null,
         ip_address: meta.ip || null
     }, { where: { code, deleted: false } });
+    cache.invalidate(MASTER_CACHE);
     return !!updated;
 };
 
@@ -120,7 +138,7 @@ exports.getJobCategories = async (whereCondition = { deleted: false }, page = 1,
 
 exports.getJobCategoryByCode = async (code, activeOnly = false) => {
     try {
-        return formatMaster(await findMasterByCode(db.jobCategory, code, { activeOnly }));
+        return (await findMasterByCode(db.jobCategory, code, { activeOnly }));
     } catch (err) {
         throw err;
     }
@@ -189,7 +207,7 @@ exports.getInstitutionTypes = async (whereCondition = { deleted: false }, page =
 
 exports.getInstitutionTypeByCode = async (code, activeOnly = false) => {
     try {
-        return formatMaster(await findMasterByCode(db.institutionType, code, { activeOnly }));
+        return (await findMasterByCode(db.institutionType, code, { activeOnly }));
     } catch (err) {
         throw err;
     }
@@ -253,7 +271,7 @@ exports.getStates = async (whereCondition = { deleted: false }, page = 1, limit 
 
 exports.getStateByCode = async (code, activeOnly = false) => {
     try {
-        return formatMaster(await findMasterByCode(db.state, code, { activeOnly }));
+        return (await findMasterByCode(db.state, code, { activeOnly }));
     } catch (err) {
         throw err;
     }
@@ -330,7 +348,7 @@ exports.getCities = async (whereCondition = { deleted: false }, page = 1, limit 
 
 exports.getCityByCode = async (code, activeOnly = false) => {
     try {
-        return formatCity(await findMasterByCode(db.city, code, { ...cityOptions, activeOnly }));
+        return (await findMasterByCode(db.city, code, { ...cityOptions, activeOnly }));
     } catch (err) {
         throw err;
     }

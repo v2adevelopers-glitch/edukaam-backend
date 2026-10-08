@@ -59,7 +59,7 @@ const checkApiModuleAccess = async (req, res, next) => {
             throw new CustomError('module_access_error', 403, "You do not have permission to access this API");
         }
 
-        if (mapped) req.user.allowedPermission = access;
+        if (mapped) req.user.allowedPermission = { ...access };
         next();
     } catch (err) {
         errorResponse(res, 'checkApiModuleAccess', err);

@@ -29,8 +29,12 @@ module.exports = (sequelize, DataTypes) => {
         tableName: "applications",
         indexes: [
             { fields: ['code'], name: 'idx_application_code', unique: true },
-            { fields: ['job_code'], name: 'idx_application_job_code' },
-            { fields: ['seeker_user_code'], name: 'idx_application_seeker_user_code' },
+            // live applications of a job (applicant counts, per-status counts) from the index alone
+            { fields: ['job_code', 'deleted', 'application_status'], name: 'idx_application_job_live' },
+            // a seeker's applications, newest first
+            { fields: ['seeker_user_code', 'deleted', 'applied_at'], name: 'idx_application_seeker_recent' },
+            // platform-wide counts per status
+            { fields: ['deleted', 'application_status'], name: 'idx_application_live_status' },
             // not unique: a withdrawn (soft-deleted) application must not block a new one.
             // "one live application per job and seeker" is enforced in the apply transaction.
             { fields: ['job_code', 'seeker_user_code'], name: 'idx_application_job_seeker' },

@@ -2,9 +2,10 @@ const { Op, fn, literal, QueryTypes } = require('sequelize');
 const db = require('../model');
 const codeGenerator = require('../helper/code_generator.helper');
 const { emptyToNull } = require('../helper/common.helper');
-const { toDateOnly } = require('../helper/query.helper');
 const { JOB_STATUS } = require('../constants/job.constant');
 const { LOGO_URL_PREFIX } = require('../constants/file.constant');
+const { toDateOnly, referencesAlias, findPage } = require('../helper/query.helper');
+const cache = require('../helper/cache.helper');
 
 const nameOnly = ['code', 'name'];
 
@@ -167,15 +168,11 @@ const providerJobOptions = {
 
 exports.getProviderJobs = async (whereCondition = { deleted: false }, page = 1, limit = 10) => {
     try {
-        const offset = (page - 1) * limit;
-        const { count, rows } = await db.job.findAndCountAll({
+        const { count, rows } = await findPage(db.job, {
             ...providerJobOptions,
             where: whereCondition,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            order: [['created_at', 'DESC'], ['id', 'DESC']],
-            distinct: true
-        });
+            order: [['created_at', 'DESC'], ['id', 'DESC']]
+        }, page, limit);
         return paginate(count, rows.map(formatProviderJob), page, limit);
     } catch (err) {
         throw err;
@@ -342,21 +339,17 @@ exports.deleteJob = async (code, provider_user_code, meta = {}) => {
 
 // ─── Hiring hooks (used by the application service inside its transaction) ───
 
+// The locked row also says whether its last date has passed (DB date), so apply needs no second query
 exports.getJobForUpdate = async (whereCondition, transaction) => {
     try {
-        return await db.job.findOne({ where: whereCondition, lock: transaction.LOCK.UPDATE, transaction });
-    } catch (err) {
-        throw err;
-    }
-};
-
-exports.isJobExpired = async (jobId, transaction = null) => {
-    try {
-        const expired = await db.job.count({
-            where: { id: jobId, last_date: { [Op.lt]: fn('CURDATE') } },
+        const job = await db.job.findOne({
+            where: whereCondition,
+            attributes: { include: [isExpiredAttr] },
+            lock: transaction.LOCK.UPDATE,
             transaction
         });
-        return expired > 0;
+        if (job) job.is_expired = toBool(job.get('is_expired'));
+        return job;
     } catch (err) {
         throw err;
     }
@@ -389,17 +382,55 @@ const openingOptions = (seekerUserCode, extraAttributes = []) => ({
     include: [...jobMasterIncludes, institutionInclude]
 });
 
-const listOpenings = async (options, whereCondition, page, limit, order) => {
-    const offset = (page - 1) * limit;
-    const { count, rows } = await db.job.findAndCountAll({
-        ...options,
-        where: whereCondition,
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        order,
-        distinct: true
-    });
-    return paginate(count, rows.map(formatOpening), page, limit);
+// Joins an opening query really needs: the provider must be active, and the profile only when
+// a filter uses it (every provider has one, so leaving it out changes nothing otherwise)
+const visibilityIncludes = (whereCondition) => [{
+    model: db.user,
+    as: 'provider',
+    attributes: [],
+    required: true,
+    where: { status: 'active', deleted: false },
+    include: referencesAlias(whereCondition, 'provider.providerProfile')
+        ? [{ model: db.providerProfile, as: 'providerProfile', attributes: [], required: true }]
+        : []
+}];
+
+// Opening totals depend only on the filters (not on who asks), so they are shared and cached
+// briefly: counting is the costly part of these high-traffic lists, and a new job shows up in the
+// rows at once (only the total lags, by at most this long)
+const OPENINGS_COUNT_TTL_MS = 60 * 1000;
+
+// Two steps instead of one findAndCountAll: (1) the page's ids, read in index order with only
+// the joins the filters need, and the count in parallel; (2) just those rows with every join.
+// One combined query made MySQL join and sort every open job to return 20 of them.
+// opts.count: false skips the count; opts.countCacheKey caches it (public list);
+// opts.orderAttributes: computed columns the order uses.
+const listOpenings = async (options, whereCondition, page, limit, order, opts = {}) => {
+    const { count = true, countCacheKey = null, orderAttributes = [] } = opts;
+    const include = visibilityIncludes(whereCondition);
+    const countQuery = () => db.job.count({ where: whereCondition, include });
+
+    const [total, idRows] = await Promise.all([
+        !count ? null : (countCacheKey ? cache.remember(countCacheKey, OPENINGS_COUNT_TTL_MS, countQuery) : countQuery()),
+        db.job.findAll({
+            where: whereCondition,
+            include,
+            attributes: ['id', ...orderAttributes],
+            order,
+            limit: parseInt(limit),
+            offset: (page - 1) * limit,
+            raw: true
+        })
+    ]);
+
+    const ids = idRows.map(r => r.id);
+    const rows = ids.length
+        ? await db.job.findAll({ ...options, attributes: ['id', ...options.attributes], where: { id: ids } })
+        : [];
+    const byId = new Map(rows.map(r => [r.id, r]));
+    const data = ids.map(id => byId.get(id)).filter(Boolean).map(formatOpening);
+
+    return count ? paginate(total, data, page, limit) : { data };
 };
 
 const NEWEST_FIRST = [['created_at', 'DESC'], ['id', 'DESC']];
@@ -410,9 +441,9 @@ const withInstitutionDetails = (row) => ({
     institution_about: row.provider.providerProfile.about
 });
 
-exports.getOpenings = async (whereCondition, seekerUserCode, page = 1, limit = 10) => {
+exports.getOpenings = async (whereCondition, seekerUserCode, page = 1, limit = 10, opts = {}) => {
     try {
-        return await listOpenings(openingOptions(seekerUserCode), whereCondition, page, limit, NEWEST_FIRST);
+        return await listOpenings(openingOptions(seekerUserCode), whereCondition, page, limit, NEWEST_FIRST, opts);
     } catch (err) {
         throw err;
     }
@@ -420,13 +451,15 @@ exports.getOpenings = async (whereCondition, seekerUserCode, page = 1, limit = 1
 
 exports.getOpening = async (whereCondition, seekerUserCode) => {
     try {
-        const row = await db.job.findOne({ ...openingOptions(seekerUserCode), where: whereCondition });
+        // the job code is in the where clause, so both lookups run at once
+        const [row, myApplication] = await Promise.all([
+            db.job.findOne({ ...openingOptions(seekerUserCode), where: whereCondition }),
+            db.application.findOne({
+                where: { job_code: whereCondition.code, seeker_user_code: seekerUserCode, deleted: false },
+                attributes: ['code', 'application_status', 'applied_at']
+            })
+        ]);
         if (!row) return null;
-
-        const myApplication = await db.application.findOne({
-            where: { job_code: row.code, seeker_user_code: seekerUserCode, deleted: false },
-            attributes: ['code', 'application_status', 'applied_at']
-        });
 
         return {
             ...withInstitutionDetails(row),
@@ -443,9 +476,11 @@ exports.getOpening = async (whereCondition, seekerUserCode) => {
 
 // ─── Public jobs ──────────────────────────────────────────────────────────
 
-exports.getPublicJobs = async (whereCondition, page = 1, limit = 10) => {
+// countCacheKey identifies the filters: the total is cached briefly (counting every visible job
+// is the one costly part of this public, high-traffic list)
+exports.getPublicJobs = async (whereCondition, page = 1, limit = 10, countCacheKey = null) => {
     try {
-        return await listOpenings(openingOptions(null), whereCondition, page, limit, NEWEST_FIRST);
+        return await listOpenings(openingOptions(null), whereCondition, page, limit, NEWEST_FIRST, { countCacheKey });
     } catch (err) {
         throw err;
     }
@@ -471,7 +506,8 @@ exports.getSavedJobs = async (whereCondition, seekerUserCode, page = 1, limit = 
             openingOptions(seekerUserCode, [savedAtAttr(seekerUserCode)]),
             { ...whereCondition, code: { [Op.in]: savedBySeeker } },
             page, limit,
-            [[literal('saved_at'), 'DESC'], ['id', 'DESC']]
+            [[literal('saved_at'), 'DESC'], ['id', 'DESC']],
+            { orderAttributes: [savedAtAttr(seekerUserCode)] }
         );
     } catch (err) {
         throw err;
@@ -550,15 +586,11 @@ const formatAdminJob = (row) => ({
 
 exports.getAdminJobs = async (whereCondition = { deleted: false }, page = 1, limit = 10) => {
     try {
-        const offset = (page - 1) * limit;
-        const { count, rows } = await db.job.findAndCountAll({
+        const { count, rows } = await findPage(db.job, {
             ...adminJobOptions,
             where: whereCondition,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            order: [['created_at', 'DESC'], ['id', 'DESC']],
-            distinct: true
-        });
+            order: [['created_at', 'DESC'], ['id', 'DESC']]
+        }, page, limit);
         return paginate(count, rows.map(formatAdminJob), page, limit);
     } catch (err) {
         throw err;

@@ -1,4 +1,5 @@
 const db = require('../model');
+const cache = require('../helper/cache.helper');
 
 const METHOD_ACCESS_FLAG = {
     GET: 'read_access',
@@ -8,8 +9,15 @@ const METHOD_ACCESS_FLAG = {
     DELETE: 'delete_access'
 };
 
+// RBAC rows change only through the seeder (a deploy), so they are cached briefly per process:
+// every write request checks them and every session restore reads the menu
+const RBAC_TTL_MS = 60 * 1000;
+
 // { mapped: false } = API not mapped to a module = allowed for every logged-in user
-exports.checkApiAccess = async (role_code, api_endpoint, api_method) => {
+exports.checkApiAccess = (role_code, api_endpoint, api_method) =>
+    cache.remember(`rbac:api:${role_code}:${api_method}:${api_endpoint}`, RBAC_TTL_MS, () => loadApiAccess(role_code, api_endpoint, api_method));
+
+const loadApiAccess = async (role_code, api_endpoint, api_method) => {
     try {
         const mapping = await db.apiModuleMapping.findOne({
             where: { api_endpoint, api_method, status: 'active', deleted: false },
@@ -35,7 +43,9 @@ exports.checkApiAccess = async (role_code, api_endpoint, api_method) => {
 
 // Sidebar tree for a role: menus of the modules the role has menu_access to, ordered by
 // ranking and nested by parent_id. A child whose parent is not visible is left out.
-exports.getMenuAccess = async (role_code) => {
+exports.getMenuAccess = (role_code) => cache.remember(`rbac:menu:${role_code}`, RBAC_TTL_MS, () => loadMenuAccess(role_code));
+
+const loadMenuAccess = async (role_code) => {
     try {
         const access = await db.roleModuleAccessMapping.findAll({
             where: { role_code, menu_access: true, status: 'active', deleted: false },

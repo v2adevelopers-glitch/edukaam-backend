@@ -3,6 +3,7 @@ const db = require('../model');
 const jobService = require('./job.service');
 const codeGenerator = require('../helper/code_generator.helper');
 const { emptyToNull } = require('../helper/common.helper');
+const { findPage } = require('../helper/query.helper');
 const { APPLICATION_STATUS, JOB_STATUS } = require('../constants/job.constant');
 const { LOGO_URL_PREFIX } = require('../constants/file.constant');
 
@@ -126,16 +127,12 @@ const formatProviderApplicationDetail = (row) => {
 
 exports.getProviderApplications = async (whereCondition = { deleted: false }, page = 1, limit = 10) => {
     try {
-        const offset = (page - 1) * limit;
-        const { count, rows } = await db.application.findAndCountAll({
+        const { count, rows } = await findPage(db.application, {
             where: whereCondition,
             attributes: APPLICATION_COLUMNS,
             include: providerIncludes(false),
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            order: [['applied_at', 'DESC'], ['id', 'DESC']],
-            distinct: true
-        });
+            order: [['applied_at', 'DESC'], ['id', 'DESC']]
+        }, page, limit);
         return paginate(count, rows.map(formatProviderApplication), page, limit);
     } catch (err) {
         throw err;
@@ -370,16 +367,12 @@ const formatSeekerApplicationDetail = (row) => ({
 
 exports.getSeekerApplications = async (whereCondition = { deleted: false }, page = 1, limit = 10) => {
     try {
-        const offset = (page - 1) * limit;
-        const { count, rows } = await db.application.findAndCountAll({
+        const { count, rows } = await findPage(db.application, {
             where: whereCondition,
             attributes: APPLICATION_COLUMNS,
             include: seekerIncludes,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-            order: [['applied_at', 'DESC'], ['id', 'DESC']],
-            distinct: true
-        });
+            order: [['applied_at', 'DESC'], ['id', 'DESC']]
+        }, page, limit);
         return paginate(count, rows.map(formatSeekerApplication), page, limit);
     } catch (err) {
         throw err;
@@ -409,7 +402,7 @@ exports.applyToJob = async (job_code, seeker, meta = {}, cover_note = null) => {
         const job = await jobService.getJobForUpdate({ code: job_code, deleted: false, status: 'active' }, t);
         if (!job || job.job_status !== JOB_STATUS.OPEN) return await fail('job_not_open');
 
-        if (await jobService.isJobExpired(job.id, t)) return await fail('job_expired');
+        if (job.is_expired) return await fail('job_expired');
 
         if (!seeker.job_category_codes.includes(job.job_category_code)) return await fail('category_mismatch');
 

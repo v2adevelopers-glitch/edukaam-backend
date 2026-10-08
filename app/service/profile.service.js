@@ -102,10 +102,12 @@ exports.getSeekerAdditionalCategories = async (user_code, transaction = null) =>
 
 exports.getSeekerProfileByUserCode = async (user_code) => {
     try {
-        const profile = await db.seekerProfile.findOne({ where: { user_code, deleted: false }, include: seekerIncludes });
+        // independent lookups: one round trip instead of two
+        const [profile, additional] = await Promise.all([
+            db.seekerProfile.findOne({ where: { user_code, deleted: false }, include: seekerIncludes }),
+            exports.getSeekerAdditionalCategories(user_code)
+        ]);
         if (!profile) return null;
-
-        const additional = await exports.getSeekerAdditionalCategories(user_code);
         return {
             ...formatSeekerProfile(profile),
             additional_job_categories: additional,
@@ -120,9 +122,11 @@ exports.getSeekerProfileByUserCode = async (user_code) => {
 // Primary + additional categories; empty when the seeker has no primary category yet
 exports.getSeekerCategoryCodes = async (user_code) => {
     try {
-        const profile = await db.seekerProfile.findOne({ where: { user_code, deleted: false }, attributes: ['job_category_code'] });
+        const [profile, additional] = await Promise.all([
+            db.seekerProfile.findOne({ where: { user_code, deleted: false }, attributes: ['job_category_code'] }),
+            exports.getSeekerAdditionalCategories(user_code)
+        ]);
         if (!profile || !profile.job_category_code) return [];
-        const additional = await exports.getSeekerAdditionalCategories(user_code);
         return [profile.job_category_code, ...additional.map(c => c.code).filter(c => c !== profile.job_category_code)];
     } catch (err) {
         throw err;

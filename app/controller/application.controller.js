@@ -253,10 +253,9 @@ const applyToJob = async (req, res) => {
             throw new CustomError('profile_incomplete', 400, `Complete your profile before applying (missing: ${missing.join(', ')})`);
         }
 
-        const categoryCodes = await profileService.getSeekerCategoryCodes(req.user.code);
         const result = await applicationService.applyToJob(
             req.body.job_code,
-            { code: req.user.code, job_category_codes: categoryCodes },
+            { code: req.user.code, job_category_codes: profile.job_category_codes },
             getMeta(req),
             req.body.cover_note
         );
